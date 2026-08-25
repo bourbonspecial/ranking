@@ -3,6 +3,15 @@
 Ranking engine for boulder problems 8C and harder, built from pairwise
 "which was harder for you?" comparisons. See [SCOPE.md](SCOPE.md).
 
+## Quick start
+
+```
+./start.sh --admin you@example.com     # venv, deps, db, frontend build, server on http://localhost:8000
+```
+Then sign in with that email on the landing page; the magic link is printed in the terminal.
+`--reset` wipes the local database back to the seed; `--dev` also runs the Vite dev server
+with hot reload on :5173.
+
 ## Data
 
 - `data/hardest_problems.csv` — source list of problems 8C+ and harder.
