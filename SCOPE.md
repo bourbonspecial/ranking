@@ -3,7 +3,7 @@
 ## Goal
 
 A single, continuously updated, globally ordered list of every boulder problem
-graded **8C or harder**, worldwide, derived from pairwise "which was harder for
+graded **8C+ or harder** (floor raised from 8C to match the source list), worldwide, derived from pairwise "which was harder for
 you?" judgements made by climbers who have climbed both problems.
 
 Grades are not the output. The ordering is. Grade bands may be layered on top
@@ -93,8 +93,8 @@ pairs remain accessible for revision.
 ## Web application
 
 ### Stack
-- **Backend:** FastAPI, SQLAlchemy, Postgres (SQLite acceptable for dev),
-  Alembic migrations. Rating recompute runs as a background job after new
+- **Backend:** FastAPI, SQLAlchemy, SQLite (committed `data/seed.sqlite` with
+  problems only; gitignored `data/local.sqlite` copied from it for running). Rating recompute runs as a background job after new
   comparisons (debounced) and on a schedule.
 - **Frontend:** Single-page app — SvelteKit or React+Vite (decide at build
   time; Svelte preferred for a small hobby project). Served by the same
@@ -182,6 +182,6 @@ batch of invites.
   rating points (seed outweighed after roughly 12 comparisons). Best or
   joint-best on the simulator across dense/sparse data and accurate/noisy
   grades; see README.
-- Access method for climbing-history.org data (API vs direct DB vs export).
+- ~~Access method for climbing-history.org data~~ — CSV export at `data/hardest_problems.csv` for now.
 - Email provider choice.
 - Svelte vs React.

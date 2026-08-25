@@ -4,6 +4,10 @@ from dataclasses import dataclass, field
 from typing import Iterable
 
 
+def _natural(pid: str):
+    return (0, int(pid), "") if pid.isdigit() else (1, 0, pid)
+
+
 @dataclass
 class ProblemRating:
     problem_id: str
@@ -23,7 +27,7 @@ class RankingResult:
     params: dict = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        self.ratings.sort(key=lambda r: (-r.rating, r.problem_id))
+        self.ratings.sort(key=lambda r: (-r.rating, _natural(r.problem_id)))
         for i, r in enumerate(self.ratings, start=1):
             r.rank = i
 

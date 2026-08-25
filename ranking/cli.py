@@ -3,6 +3,11 @@
     ranking rank problems.csv comparisons.csv [--algo bradley_terry|elo|win_rate] [--prior-sd 100]
     ranking simulate [--problems N] [--climbers N] [--seed S] [--prior-sd 100]
 
+    ranking db build-seed          rebuild data/seed.sqlite from data/hardest_problems.csv
+    ranking db init [--force]      copy seed -> data/local.sqlite (gitignored)
+    ranking recompute [--db PATH]  fit every algorithm and store a snapshot
+    ranking list [--algo A] [--db PATH]   print the latest stored ranking
+
 problems.csv columns:    id,name,seed_grade[,area,country,ascent_count]
 comparisons.csv columns: climber_id,problem_a,problem_b,verdict[,created_at]
   verdict is one of A_HARDER, SIMILAR, B_HARDER; created_at is ISO-8601.
@@ -85,8 +90,51 @@ def main(argv=None) -> None:
     s.add_argument("--k", type=float, default=32.0)
     s.add_argument("--fraction", type=float, default=1.0, help="fraction of possible pairs each climber answers")
 
+    d = sub.add_parser("db")
+    dsub = d.add_subparsers(dest="dbcmd", required=True)
+    dsub.add_parser("build-seed")
+    di = dsub.add_parser("init")
+    di.add_argument("--force", action="store_true", help="overwrite an existing local db")
+
+    rc = sub.add_parser("recompute")
+    rc.add_argument("--db", default=None)
+
+    ls = sub.add_parser("list")
+    ls.add_argument("--algo", default="bradley_terry", choices=["bradley_terry", "elo", "win_rate"])
+    ls.add_argument("--db", default=None)
+
     a = p.parse_args(argv)
-    if a.cmd == "rank":
+    if a.cmd == "db":
+        from .db import LOCAL_DB, SEED_DB, init_local_db
+        from .importer import build_seed_db
+        if a.dbcmd == "build-seed":
+            n = build_seed_db()
+            print(f"wrote {n} problems to {SEED_DB}")
+        else:
+            existed = LOCAL_DB.exists()
+            path = init_local_db(force=a.force)
+            print(("kept existing " if existed and not a.force else "created ") + str(path))
+    elif a.cmd in ("recompute", "list"):
+        from pathlib import Path
+        from .db import LOCAL_DB, init_local_db, make_session_factory
+        from . import repo
+        db_path = Path(a.db) if a.db else init_local_db()
+        with make_session_factory(db_path)() as s:
+            if a.cmd == "recompute":
+                runs = repo.recompute_all(s)
+                for algo, run in runs.items():
+                    print(f"{algo}: run {run.id}, {run.n_comparisons} comparisons")
+            else:
+                rows = repo.latest_ranking(s, a.algo)
+                if not rows:
+                    raise SystemExit("no stored ranking; run `ranking recompute` first")
+                w = csv.writer(sys.stdout)
+                w.writerow(["rank", "id", "name", "crag", "grade", "rating", "uncertainty", "n_comparisons", "n_climbers", "confidence"])
+                for snap, prob in rows:
+                    w.writerow([snap.rank, prob.id, prob.name, prob.crag, prob.current_grade, round(snap.rating, 1),
+                                None if snap.uncertainty is None else round(snap.uncertainty, 1),
+                                snap.n_comparisons, snap.n_climbers, confidence_tier(snap.n_comparisons, snap.n_climbers)])
+    elif a.cmd == "rank":
         print_result(run(load_problems(a.problems), load_comparisons(a.comparisons), a.algo, a.prior_sd, a.k))
     else:
         from .simulate import SimConfig, simulate, spearman, kendall_tau

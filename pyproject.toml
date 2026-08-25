@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.26",
     "scipy>=1.11",
+    "sqlalchemy>=2.0",
 ]
 
 [project.optional-dependencies]

@@ -3,6 +3,23 @@
 Ranking engine for boulder problems 8C and harder, built from pairwise
 "which was harder for you?" comparisons. See [SCOPE.md](SCOPE.md).
 
+## Data
+
+- `data/hardest_problems.csv` — source list of problems 8C+ and harder.
+- `data/seed.sqlite` — committed. Built from the CSV with `ranking db build-seed`; problems only.
+- `data/local.sqlite` — gitignored. Copied from the seed on first `ranking db init`; all local
+  climbers, comparisons and rating snapshots live here.
+
+```
+.venv/bin/ranking db init        # copy seed -> local (no-op if it exists; --force to reset)
+.venv/bin/ranking recompute      # fit every algorithm, store a snapshot run in local.sqlite
+.venv/bin/ranking list           # latest stored ranking (--algo elo|win_rate)
+```
+
+Schema (`ranking/db.py`): problems, climbers, ascents, comparisons (live, one per
+climber-pair), comparison_history (audit only), rating_runs, rating_snapshots.
+`ranking/repo.py` is the repository layer the API will sit on.
+
 ## Phase 1: rating engine
 
 ```
