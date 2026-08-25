@@ -52,6 +52,10 @@ public address; `RANKING_ADMIN_EMAILS` for emails that become admins on first si
 | `GET /api/me/ranking` | member | personal ranking with global rank alongside |
 | `GET /api/admin/climbers?status=` · `POST /api/admin/climbers/{id}/invite` · `POST /api/admin/invite` · `POST /api/admin/climbers/{id}/reject` · `POST /api/admin/climbers/{id}/admin` · `POST /api/admin/recompute` | admin | invite queue and tooling |
 
+Ascents are `done` or `tried`. Comparisons involving a tried problem are offered last, opt-in,
+weighted at `RANKING_ATTEMPT_WEIGHT` (default 0.4), excluded from the ranking gate, and stored as
+a separate ranking variant (`GET /api/ranking?include_attempts=true`).
+
 Ratings are recomputed in the background ~20s after the last comparison (`RANKING_RECOMPUTE_DEBOUNCE`).
 
 ## Phase 3: frontend

@@ -7,12 +7,12 @@ from sqlalchemy.orm import Session
 
 from .. import repo
 from ..confidence import confidence_tier
-from ..db import AscentRow, ClimberRow, ComparisonRow, ProblemRow
+from ..db import ASCENT_DONE, ASCENT_TRIED, AscentRow, ClimberRow, ComparisonRow, ProblemRow
 from ..models import Verdict
 from . import auth
 from .deps import get_db, get_mailer, get_recomputer, get_settings
 from .schemas import (
-    AscentsIn, ClimberOut, ComparisonIn, ComparisonOut, EmailIn, InviteIn, InviteRequestIn,
+    AscentsIn, AscentsOut, ClimberOut, ComparisonIn, ComparisonOut, EmailIn, InviteIn, InviteRequestIn,
     PairOut, PersonalRowOut, ProblemOut, ProgressOut, RankingOut, RankingRowOut,
 )
 
@@ -87,35 +87,36 @@ def list_problems(s: Session = Depends(get_db)):
     return [problem_out(p) for p in s.scalars(select(ProblemRow).order_by(ProblemRow.id))]
 
 
-@member.get("/me/ascents", response_model=list[int])
+@member.get("/me/ascents", response_model=AscentsOut)
 def get_ascents(s: Session = Depends(get_db), climber=Depends(auth.current_climber)):
-    return [int(p.id) for p in repo.ticked_problems(s, climber.id)]
+    st = repo.ascent_statuses(s, climber.id)
+    return AscentsOut(done=sorted(p for p, v in st.items() if v == ASCENT_DONE),
+                      tried=sorted(p for p, v in st.items() if v == ASCENT_TRIED))
 
 
 @member.put("/me/ascents", response_model=ProgressOut)
 def put_ascents(body: AscentsIn, s: Session = Depends(get_db), climber=Depends(auth.current_climber)):
     known = {p.id for p in s.scalars(select(ProblemRow))}
-    bad = set(body.problem_ids) - known
+    bad = (set(body.done) | set(body.tried)) - known
     if bad:
         raise HTTPException(400, f"unknown problem ids: {sorted(bad)}")
-    repo.set_ascents(s, climber.id, body.problem_ids)
+    repo.set_ascents(s, climber.id, body.done, body.tried)
     return progress(s, climber)
 
 
 @member.get("/me/progress", response_model=ProgressOut)
 def progress(s: Session = Depends(get_db), climber=Depends(auth.current_climber)):
-    ok, made, need = repo.can_view_ranking(s, climber.id)
-    n_ticked = len(repo.ticked_problems(s, climber.id))
-    return ProgressOut(n_ticked=n_ticked, n_possible_pairs=n_ticked * (n_ticked - 1) // 2, n_answered=made,
-                       ranking_unlocked=ok, ranking_required=need)
+    return ProgressOut(**repo.progress(s, climber.id))
 
 
 @member.get("/me/pairs", response_model=list[PairOut])
 def pairs(limit: int = 20, s: Session = Depends(get_db), climber=Depends(auth.current_climber)):
+    st = repo.ascent_statuses(s, climber.id)
     out = []
-    for a, b in repo.next_pairs(s, climber.id, limit=limit):
+    for a, b, kind in repo.next_pairs(s, climber.id, limit=limit):
         out.append(PairOut(problem_a=problem_out(s.get(ProblemRow, int(a.id))),
-                           problem_b=problem_out(s.get(ProblemRow, int(b.id)))))
+                           problem_b=problem_out(s.get(ProblemRow, int(b.id))),
+                           kind=kind, status_a=st[int(a.id)], status_b=st[int(b.id)]))
     return out
 
 
@@ -138,36 +139,41 @@ def my_comparisons(s: Session = Depends(get_db), climber=Depends(auth.current_cl
     return [
         ComparisonOut(problem_a=problem_out(s.get(ProblemRow, r.problem_a)),
                       problem_b=problem_out(s.get(ProblemRow, r.problem_b)),
-                      verdict=Verdict(r.verdict), updated_at=r.updated_at.isoformat())
-        for r in repo.climber_comparisons(s, climber.id)
+                      verdict=Verdict(r.verdict), updated_at=r.updated_at.isoformat(), kind=kind)
+        for r, kind in repo.climber_comparisons(s, climber.id)
     ]
 
 
 @member.get("/ranking", response_model=RankingOut)
-def ranking(algo: str = "bradley_terry", s: Session = Depends(get_db), climber=Depends(auth.current_climber)):
+def ranking(algo: str = "bradley_terry", include_attempts: bool = False,
+            s: Session = Depends(get_db), climber=Depends(auth.current_climber), settings=Depends(get_settings)):
     if algo not in repo.ALGORITHMS:
         raise HTTPException(400, f"algo must be one of {repo.ALGORITHMS}")
     ok, made, need = repo.can_view_ranking(s, climber.id)
     if not ok and not climber.is_admin:
-        raise HTTPException(403, f"Make {need - made} more comparison(s) to unlock the ranking.")
-    run = repo.latest_run(s, algo)
+        raise HTTPException(403, f"Compare {need - made} more pair(s) of problems you've climbed to unlock the ranking.")
+    run = repo.latest_run(s, algo, include_attempts)
     rows = [
         RankingRowOut(rank=snap.rank, problem=problem_out(prob), rating=round(snap.rating, 1),
                       uncertainty=None if snap.uncertainty is None else round(snap.uncertainty, 1),
                       n_comparisons=snap.n_comparisons, n_climbers=snap.n_climbers,
                       confidence=confidence_tier(snap.n_comparisons, snap.n_climbers), seed_grade=prob.seed_grade)
-        for snap, prob in repo.latest_ranking(s, algo)
+        for snap, prob in repo.latest_ranking(s, algo, include_attempts)
     ]
-    return RankingOut(algorithm=algo, computed_at=run.computed_at.isoformat() if run else None,
+    return RankingOut(algorithm=algo, include_attempts=include_attempts,
+                      attempt_weight=settings.attempt_weight if include_attempts else None,
+                      computed_at=run.computed_at.isoformat() if run else None,
                       n_comparisons=run.n_comparisons if run else 0, rows=rows)
 
 
 @member.get("/me/ranking", response_model=list[PersonalRowOut])
-def my_ranking(s: Session = Depends(get_db), climber=Depends(auth.current_climber)):
-    mine = repo.personal(s, climber.id)
+def my_ranking(s: Session = Depends(get_db), climber=Depends(auth.current_climber), settings=Depends(get_settings)):
+    mine = repo.personal(s, climber.id, settings.attempt_weight)
+    st = repo.ascent_statuses(s, climber.id)
     global_rank = {prob.id: snap.rank for snap, prob in repo.latest_ranking(s, "bradley_terry")}
     return [
         PersonalRowOut(rank=r.rank, problem=problem_out(s.get(ProblemRow, int(r.problem_id))),
+                       status=st.get(int(r.problem_id), ASCENT_DONE),
                        rating=round(r.rating, 1), global_rank=global_rank.get(int(r.problem_id)),
                        n_comparisons=r.n_comparisons)
         for r in mine.ratings

@@ -100,9 +100,11 @@ def main(argv=None) -> None:
 
     rc = sub.add_parser("recompute")
     rc.add_argument("--db", default=None)
+    rc.add_argument("--attempt-weight", type=float, default=0.4)
 
     ls = sub.add_parser("list")
     ls.add_argument("--algo", default="bradley_terry", choices=["bradley_terry", "elo", "win_rate"])
+    ls.add_argument("--include-attempts", action="store_true")
     ls.add_argument("--db", default=None)
 
     sv = sub.add_parser("serve")
@@ -151,11 +153,11 @@ def main(argv=None) -> None:
         db_path = Path(a.db) if a.db else init_local_db()
         with make_session_factory(db_path)() as s:
             if a.cmd == "recompute":
-                runs = repo.recompute_all(s)
-                for algo, run in runs.items():
-                    print(f"{algo}: run {run.id}, {run.n_comparisons} comparisons")
+                runs = repo.recompute_all(s, a.attempt_weight)
+                for (algo, inc), run in runs.items():
+                    print(f"{algo}{' +attempts' if inc else ''}: run {run.id}, {run.n_comparisons} comparisons")
             else:
-                rows = repo.latest_ranking(s, a.algo)
+                rows = repo.latest_ranking(s, a.algo, a.include_attempts)
                 if not rows:
                     raise SystemExit("no stored ranking; run `ranking recompute` first")
                 w = csv.writer(sys.stdout)

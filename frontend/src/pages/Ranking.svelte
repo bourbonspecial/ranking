@@ -1,12 +1,13 @@
 <script>
   import { api } from '../lib/api.js'
   let data = $state(null), err = $state(''), locked = $state(null), algo = $state('bradley_terry'), q = $state(''), gradeFilter = $state('')
+  let includeAttempts = $state(false)
   const algos = [['bradley_terry', 'Bradley–Terry'], ['elo', 'Elo'], ['win_rate', 'Win rate']]
 
-  $effect(() => { load(algo) })
-  async function load(a) {
+  $effect(() => { load(algo, includeAttempts) })
+  async function load(a, inc) {
     err = ''; locked = null
-    try { data = await api.get(`/api/ranking?algo=${a}`) }
+    try { data = await api.get(`/api/ranking?algo=${a}&include_attempts=${inc}`) }
     catch (x) { if (x.status === 403) locked = x.message; else err = x.message; data = null }
   }
   let rows = $derived((data?.rows ?? []).filter(r =>
@@ -18,9 +19,12 @@
 <div class="container">
   <div class="row" style="justify-content: space-between; margin-bottom: 1rem">
     <div><h1>The list</h1>
-      {#if data}<p class="muted small">{data.n_comparisons} comparisons · {data.computed_at ? 'updated ' + data.computed_at.replace('T', ' ').slice(0, 16) : 'not yet computed'}</p>{/if}
+      {#if data}<p class="muted small">{data.n_comparisons} comparisons{#if data.include_attempts}, incl. attempts at {Math.round(data.attempt_weight * 100)}% weight{/if} · {data.computed_at ? 'updated ' + data.computed_at.replace('T', ' ').slice(0, 16) : 'not yet computed'}</p>{/if}
     </div>
     <div class="row">
+      <label class="row small" style="gap:.4rem; margin:0; cursor:pointer" title="Also count comparisons where a member had only tried one of the problems (down-weighted)">
+        <input type="checkbox" bind:checked={includeAttempts} style="width:auto; accent-color: var(--accent)" /> Include attempts
+      </label>
       <select bind:value={gradeFilter} style="width:auto"><option value="">All grades</option>{#each grades as g}<option>{g}</option>{/each}</select>
       <select bind:value={algo} style="width:auto">{#each algos as [v, l]}<option value={v}>{l}</option>{/each}</select>
     </div>

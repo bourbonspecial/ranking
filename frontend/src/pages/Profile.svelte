@@ -11,8 +11,10 @@
   <p class="muted">{session.me.email} {#if session.me.is_admin}· admin{/if}</p>
   {#if progress}
     <div class="row" style="margin: 1rem 0 2rem">
-      <div class="card stat"><div class="big">{progress.n_ticked}</div><div class="muted small">ascents</div></div>
-      <div class="card stat"><div class="big">{progress.n_answered}</div><div class="muted small">of {progress.n_possible_pairs} pairs answered</div></div>
+      <div class="card stat"><div class="big">{progress.n_done}</div><div class="muted small">climbed</div></div>
+      <div class="card stat"><div class="big">{progress.n_tried}</div><div class="muted small">tried</div></div>
+      <div class="card stat"><div class="big">{progress.n_done_answered}</div><div class="muted small">of {progress.n_done_pairs} climbed pairs answered</div></div>
+      {#if progress.n_attempt_pairs}<div class="card stat"><div class="big">{progress.n_attempt_answered}</div><div class="muted small">of {progress.n_attempt_pairs} attempt pairs answered</div></div>{/if}
     </div>
   {/if}
 
@@ -28,7 +30,7 @@
       <tr>
         <td class="num">{r.rank}</td>
         <td class="num faint">{r.global_rank ?? '–'}</td>
-        <td><strong>{r.problem.name}</strong> <span class="muted small">{r.problem.crag}</span></td>
+        <td><strong>{r.problem.name}</strong> <span class="muted small">{r.problem.crag}</span> {#if r.status === 'tried'}<span class="pill none">tried</span>{/if}</td>
         <td><span class="grade">{r.problem.grade}</span></td>
         <td class="num">{r.rating.toFixed(0)}</td>
         <td class="num faint">{r.n_comparisons}</td>

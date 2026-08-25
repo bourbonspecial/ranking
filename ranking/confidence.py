@@ -18,8 +18,9 @@ def confidence(comparisons: Iterable[Comparison]) -> dict[str, tuple[int, int]]:
     return {p: (n_comp[p], len(climbers[p])) for p in n_comp}
 
 
-def confidence_tier(n_comparisons: int, n_climbers: int) -> str:
-    if n_comparisons == 0:
+def confidence_tier(n_comparisons: float, n_climbers: int) -> str:
+    """n_comparisons may be a weighted total (attempt comparisons count for less)."""
+    if n_comparisons <= 0:
         return "none"
     if n_climbers >= 5 and n_comparisons >= 15:
         return "high"

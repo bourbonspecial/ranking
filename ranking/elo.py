@@ -36,7 +36,7 @@ def replay_elo(
         a, b = c.problem_a, c.problem_b
         s_a = {Verdict.A_HARDER: 1.0, Verdict.B_HARDER: 0.0, Verdict.SIMILAR: 0.5}[c.verdict]
         e_a = expected_score(rating[a], rating[b])
-        delta = config.k * (s_a - e_a)
+        delta = config.k * c.weight * (s_a - e_a)
         rating[a] += delta
         rating[b] -= delta
     conf = confidence(comparisons)

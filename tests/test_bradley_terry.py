@@ -52,14 +52,15 @@ def test_gradient_matches_finite_differences():
     n = 5
     ia = rng.integers(0, n, 40); ib = (ia + rng.integers(1, n, 40)) % n
     y = rng.integers(0, 3, 40)
+    w = rng.uniform(0.2, 1.0, 40)
     mu = rng.normal(0, 1, n); pv = 0.8
     x = np.concatenate([rng.normal(0, 1, n), [np.log(0.7)]])
-    f0, g = _neg_log_post(x, ia, ib, y, mu, pv, n, True, 0.5)
+    f0, g = _neg_log_post(x, ia, ib, y, w, mu, pv, n, True, 0.5)
     eps = 1e-6
     for k in range(n + 1):
         e = np.zeros(n + 1); e[k] = eps
-        fd = (_neg_log_post(x + e, ia, ib, y, mu, pv, n, True, 0.5)[0]
-              - _neg_log_post(x - e, ia, ib, y, mu, pv, n, True, 0.5)[0]) / (2 * eps)
+        fd = (_neg_log_post(x + e, ia, ib, y, w, mu, pv, n, True, 0.5)[0]
+              - _neg_log_post(x - e, ia, ib, y, w, mu, pv, n, True, 0.5)[0]) / (2 * eps)
         assert abs(fd - g[k]) < 1e-5
 
 

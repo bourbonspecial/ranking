@@ -18,17 +18,17 @@ from .result import ProblemRating, RankingResult
 def win_rate(problems: Sequence[Problem], comparisons: Iterable[Comparison]) -> RankingResult:
     comparisons = list(comparisons)
     wins: dict[str, float] = defaultdict(float)
-    games: dict[str, int] = defaultdict(int)
+    games: dict[str, float] = defaultdict(float)
     for c in comparisons:
-        games[c.problem_a] += 1
-        games[c.problem_b] += 1
+        games[c.problem_a] += c.weight
+        games[c.problem_b] += c.weight
         if c.verdict is Verdict.A_HARDER:
-            wins[c.problem_a] += 1
+            wins[c.problem_a] += c.weight
         elif c.verdict is Verdict.B_HARDER:
-            wins[c.problem_b] += 1
+            wins[c.problem_b] += c.weight
         else:
-            wins[c.problem_a] += 0.5
-            wins[c.problem_b] += 0.5
+            wins[c.problem_a] += 0.5 * c.weight
+            wins[c.problem_b] += 0.5 * c.weight
     conf = confidence(comparisons)
     ratings = [
         ProblemRating(

@@ -68,10 +68,16 @@ class ClimberRow(Base):
     ascents: Mapped[list["AscentRow"]] = relationship(back_populates="climber", cascade="all, delete-orphan")
 
 
+ASCENT_DONE = "done"
+ASCENT_TRIED = "tried"
+
+
 class AscentRow(Base):
+    """A problem on a climber's list: either climbed ("done") or attempted ("tried")."""
     __tablename__ = "ascents"
     climber_id: Mapped[int] = mapped_column(ForeignKey("climbers.id"), primary_key=True)
     problem_id: Mapped[int] = mapped_column(ForeignKey("problems.id"), primary_key=True)
+    status: Mapped[str] = mapped_column(String, nullable=False, default=ASCENT_DONE, server_default=ASCENT_DONE)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
     climber: Mapped[ClimberRow] = relationship(back_populates="ascents")
 
@@ -120,6 +126,7 @@ class RatingRunRow(Base):
     __tablename__ = "rating_runs"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     algorithm: Mapped[str] = mapped_column(String, nullable=False)
+    include_attempts: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     computed_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
     n_comparisons: Mapped[int] = mapped_column(Integer, default=0)
     params_json: Mapped[str] = mapped_column(Text, default="{}")
@@ -152,8 +159,22 @@ def make_session_factory(path: Path | str) -> sessionmaker[Session]:
     return sessionmaker(bind=make_engine(path), expire_on_commit=False)
 
 
+# Columns added after a table first shipped. create_all() only creates missing
+# tables, so these are applied with ALTER TABLE when absent. (table, column, DDL)
+_ADDED_COLUMNS = [
+    ("ascents", "status", "VARCHAR NOT NULL DEFAULT 'done'"),
+    ("rating_runs", "include_attempts", "BOOLEAN NOT NULL DEFAULT 0"),
+]
+
+
 def create_schema(path: Path | str) -> None:
-    Base.metadata.create_all(make_engine(path))
+    engine = make_engine(path)
+    Base.metadata.create_all(engine)
+    with engine.begin() as conn:
+        for table, column, ddl in _ADDED_COLUMNS:
+            cols = {row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})")}
+            if column not in cols:
+                conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
 
 
 def init_local_db(seed: Path = SEED_DB, local: Path = LOCAL_DB, force: bool = False) -> Path:

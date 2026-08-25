@@ -43,7 +43,13 @@ class InviteIn(BaseModel):
 
 
 class AscentsIn(BaseModel):
-    problem_ids: list[int]
+    done: list[int] = Field(default_factory=list)   # climbed
+    tried: list[int] = Field(default_factory=list)  # attempted, not climbed
+
+
+class AscentsOut(BaseModel):
+    done: list[int]
+    tried: list[int]
 
 
 class ComparisonIn(BaseModel):
@@ -57,17 +63,24 @@ class ComparisonOut(BaseModel):
     problem_b: ProblemOut
     verdict: Verdict
     updated_at: str
+    kind: str  # "done" | "attempt"
 
 
 class PairOut(BaseModel):
     problem_a: ProblemOut
     problem_b: ProblemOut
+    kind: str  # "done" (both climbed) | "attempt" (at least one only tried)
+    status_a: str
+    status_b: str
 
 
 class ProgressOut(BaseModel):
-    n_ticked: int
-    n_possible_pairs: int
-    n_answered: int
+    n_done: int
+    n_tried: int
+    n_done_pairs: int
+    n_done_answered: int
+    n_attempt_pairs: int
+    n_attempt_answered: int
     ranking_unlocked: bool
     ranking_required: int
 
@@ -85,6 +98,8 @@ class RankingRowOut(BaseModel):
 
 class RankingOut(BaseModel):
     algorithm: str
+    include_attempts: bool
+    attempt_weight: float | None
     computed_at: str | None
     n_comparisons: int
     rows: list[RankingRowOut]
@@ -93,6 +108,7 @@ class RankingOut(BaseModel):
 class PersonalRowOut(BaseModel):
     rank: int
     problem: ProblemOut
+    status: str  # "done" | "tried"
     rating: float
     global_rank: int | None
     n_comparisons: int

@@ -28,7 +28,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.session_factory = session_factory
     app.state.mailer = Mailer(settings)
-    app.state.recomputer = Recomputer(session_factory, settings.recompute_debounce_seconds)
+    app.state.recomputer = Recomputer(session_factory, settings.recompute_debounce_seconds, settings.attempt_weight)
     app.include_router(public)
     app.include_router(member)
     app.include_router(admin)

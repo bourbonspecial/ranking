@@ -19,6 +19,7 @@ class Settings:
     magic_link_ttl_minutes: int = 30
     session_ttl_days: int = 90
     recompute_debounce_seconds: float = 20.0
+    attempt_weight: float = 0.4               # weight of a comparison involving a problem only attempted
     cookie_secure: bool = False
 
     @classmethod
@@ -35,5 +36,6 @@ class Settings:
             smtp_password=e("RANKING_SMTP_PASSWORD", ""),
             admin_emails=[x.strip().lower() for x in e("RANKING_ADMIN_EMAILS", "").split(",") if x.strip()],
             recompute_debounce_seconds=float(e("RANKING_RECOMPUTE_DEBOUNCE", "20")),
+            attempt_weight=float(e("RANKING_ATTEMPT_WEIGHT", "0.4")),
             cookie_secure=e("RANKING_COOKIE_SECURE", "0") == "1",
         )

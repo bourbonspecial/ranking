@@ -81,40 +81,53 @@ def test_invite_request_then_admin_invite_then_member_flow(app, anon, admin):
     problems = nalle.get("/api/problems").json()
     assert len(problems) == 85
     ids = [p["id"] for p in problems[:5]]
-    prog = nalle.put("/api/me/ascents", json={"problem_ids": ids}).json()
-    assert prog == {"n_ticked": 5, "n_possible_pairs": 10, "n_answered": 0,
+    tried = problems[20]["id"]
+    prog = nalle.put("/api/me/ascents", json={"done": ids, "tried": [tried]}).json()
+    assert prog == {"n_done": 5, "n_tried": 1, "n_done_pairs": 10, "n_done_answered": 0,
+                    "n_attempt_pairs": 5, "n_attempt_answered": 0,
                     "ranking_unlocked": False, "ranking_required": 10}
+    assert nalle.get("/api/me/ascents").json() == {"done": sorted(ids), "tried": [tried]}
     assert nalle.get("/api/ranking").status_code == 403
 
     pairs = nalle.get("/api/me/pairs", params={"limit": 3}).json()
-    assert len(pairs) == 3
-    for pr in nalle.get("/api/me/pairs").json():
+    assert len(pairs) == 3 and all(p["kind"] == "done" for p in pairs)
+    all_pairs = nalle.get("/api/me/pairs").json()
+    assert [p["kind"] for p in all_pairs] == ["done"] * 10 + ["attempt"] * 5
+    for pr in all_pairs[:10]:
         r = nalle.post("/api/me/comparisons", json={"problem_a": pr["problem_a"]["id"],
                                                     "problem_b": pr["problem_b"]["id"], "verdict": "A_HARDER"})
         assert r.status_code == 200
     assert r.json()["ranking_unlocked"] is True
-    assert nalle.get("/api/me/pairs").json() == []
-    assert len(nalle.get("/api/me/comparisons").json()) == 10
+    remaining = nalle.get("/api/me/pairs").json()
+    assert len(remaining) == 5 and all(p["kind"] == "attempt" for p in remaining)
+    r = nalle.post("/api/me/comparisons", json={"problem_a": tried, "problem_b": ids[0], "verdict": "A_HARDER"})
+    assert r.json()["n_attempt_answered"] == 1
+    mine = nalle.get("/api/me/comparisons").json()
+    assert len(mine) == 11 and sum(c["kind"] == "attempt" for c in mine) == 1
 
     # revise one
     r = nalle.post("/api/me/comparisons", json={"problem_a": ids[0], "problem_b": ids[1], "verdict": "SIMILAR"})
     assert r.status_code == 200
-    assert len(nalle.get("/api/me/comparisons").json()) == 10
+    assert len(nalle.get("/api/me/comparisons").json()) == 11
 
     # 5. ranking (recompute ran synchronously with debounce=0)
     rk = nalle.get("/api/ranking").json()
     assert rk["algorithm"] == "bradley_terry" and len(rk["rows"]) == 85 and rk["n_comparisons"] == 10
+    assert rk["include_attempts"] is False and rk["attempt_weight"] is None
+    with_att = nalle.get("/api/ranking", params={"include_attempts": "true"}).json()
+    assert with_att["n_comparisons"] == 11 and with_att["attempt_weight"] == 0.4
     assert rk["rows"][0]["rank"] == 1
     assert nalle.get("/api/ranking", params={"algo": "elo"}).json()["algorithm"] == "elo"
     assert nalle.get("/api/ranking", params={"algo": "bogus"}).status_code == 400
 
     mine = nalle.get("/api/me/ranking").json()
-    assert len(mine) == 5 and all(row["global_rank"] is not None for row in mine)
+    assert len(mine) == 6 and all(row["global_rank"] is not None for row in mine)
+    assert sum(row["status"] == "tried" for row in mine) == 1
 
     # bad inputs
     assert nalle.post("/api/me/comparisons", json={"problem_a": ids[0], "problem_b": ids[0], "verdict": "SIMILAR"}).status_code == 400
     assert nalle.post("/api/me/comparisons", json={"problem_a": ids[0], "problem_b": 80, "verdict": "SIMILAR"}).status_code == 400
-    assert nalle.put("/api/me/ascents", json={"problem_ids": [99999]}).status_code == 400
+    assert nalle.put("/api/me/ascents", json={"done": [99999]}).status_code == 400
 
 
 def test_admin_direct_invite_and_reject(app, admin):

@@ -19,7 +19,7 @@
     <p class="faint">Nothing yet. <a href="/compare">Start comparing →</a></p>
   {:else}
   <div class="tableWrap"><table>
-    <thead><tr><th>Problem</th><th></th><th>Problem</th><th>Answered</th></tr></thead>
+    <thead><tr><th>Problem</th><th></th><th>Problem</th><th></th><th>Answered</th></tr></thead>
     <tbody>
     {#each rows as r}
       <tr>
@@ -30,7 +30,8 @@
           <button class:sel={r.verdict === 'B_HARDER'} onclick={() => set(r, 'B_HARDER')} title="right was harder">▶</button>
         </td>
         <td><Problem p={r.problem_b} /></td>
-        <td class="faint small mono">{r.updated_at.slice(0, 10)}</td>
+        <td>{#if r.kind === 'attempt'}<span class="pill none" title="Involves a problem you've tried but not climbed; counts for less">attempt</span>{/if}</td>
+        <td class="faint small mono" style="white-space:nowrap">{r.updated_at.slice(0, 10)}</td>
       </tr>
     {/each}
     </tbody>

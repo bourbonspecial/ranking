@@ -45,17 +45,19 @@ class BradleyTerryConfig:
 
 def _encode(problems: Sequence[Problem], comparisons: Iterable[Comparison]):
     index = {p.id: k for k, p in enumerate(problems)}
-    ia, ib, y = [], [], []
+    ia, ib, y, w = [], [], [], []
     for c in comparisons:
         if c.problem_a not in index or c.problem_b not in index:
             raise KeyError(f"comparison references unknown problem: {c.pair}")
         ia.append(index[c.problem_a])
         ib.append(index[c.problem_b])
         y.append({Verdict.A_HARDER: 0, Verdict.B_HARDER: 1, Verdict.SIMILAR: 2}[c.verdict])
-    return index, np.array(ia, dtype=int), np.array(ib, dtype=int), np.array(y, dtype=int)
+        w.append(c.weight)
+    return (index, np.array(ia, dtype=int), np.array(ib, dtype=int), np.array(y, dtype=int),
+            np.array(w, dtype=float))
 
 
-def _neg_log_post(params, ia, ib, y, mu, prior_var, n, fit_nu, fixed_nu, nu_mu=-0.7, nu_var=2.25):
+def _neg_log_post(params, ia, ib, y, w, mu, prior_var, n, fit_nu, fixed_nu, nu_mu=-0.7, nu_var=2.25):
     theta = params[:n]
     log_nu = params[n] if fit_nu else np.log(fixed_nu)
     ta, tb = theta[ia], theta[ib]
@@ -66,28 +68,28 @@ def _neg_log_post(params, ia, ib, y, mu, prior_var, n, fit_nu, fixed_nu, nu_mu=-
     D = ea + eb + em
     logD = m + np.log(D)
     chosen = np.where(y == 0, ta, np.where(y == 1, tb, mid))
-    nll = np.sum(logD - chosen)
+    nll = np.sum(w * (logD - chosen))
     nlp = 0.5 * np.sum((theta - mu) ** 2 / prior_var)
 
     # gradient
     pa, pb, pm = ea / D, eb / D, em / D
     g_theta = np.zeros(n)
     # d(logD)/d ta = pa + 0.5 pm ; d/d tb = pb + 0.5 pm
-    ga = pa + 0.5 * pm - np.where(y == 0, 1.0, np.where(y == 2, 0.5, 0.0))
-    gb = pb + 0.5 * pm - np.where(y == 1, 1.0, np.where(y == 2, 0.5, 0.0))
+    ga = w * (pa + 0.5 * pm - np.where(y == 0, 1.0, np.where(y == 2, 0.5, 0.0)))
+    gb = w * (pb + 0.5 * pm - np.where(y == 1, 1.0, np.where(y == 2, 0.5, 0.0)))
     np.add.at(g_theta, ia, ga)
     np.add.at(g_theta, ib, gb)
     g_theta += (theta - mu) / prior_var
     if fit_nu:
         nlp += 0.5 * (log_nu - nu_mu) ** 2 / nu_var
-        g_nu = np.sum(pm - (y == 2)) + (log_nu - nu_mu) / nu_var
+        g_nu = np.sum(w * (pm - (y == 2))) + (log_nu - nu_mu) / nu_var
         grad = np.concatenate([g_theta, [g_nu]])
     else:
         grad = g_theta
     return nll + nlp, grad
 
 
-def _hessian_theta(theta, log_nu, ia, ib, prior_var, n):
+def _hessian_theta(theta, log_nu, ia, ib, w, prior_var, n):
     """Hessian of the negative log posterior w.r.t. theta only (nu held fixed)."""
     ta, tb = theta[ia], theta[ib]
     mid = 0.5 * (ta + tb) + log_nu
@@ -102,9 +104,9 @@ def _hessian_theta(theta, log_nu, ia, ib, prior_var, n):
     Euu = pa + 0.25 * pm        # E[u^2]
     Evv = pb + 0.25 * pm
     Euv = 0.25 * pm
-    haa = Euu - Ea * Ea
-    hbb = Evv - Eb * Eb
-    hab = Euv - Ea * Eb
+    haa = w * (Euu - Ea * Ea)
+    hbb = w * (Evv - Eb * Eb)
+    hab = w * (Euv - Ea * Eb)
     H = np.zeros((n, n))
     np.add.at(H, (ia, ia), haa)
     np.add.at(H, (ib, ib), hbb)
@@ -122,7 +124,7 @@ def fit_bradley_terry(
     config = config or BradleyTerryConfig()
     comparisons = list(comparisons)
     n = len(problems)
-    index, ia, ib, y = _encode(problems, comparisons)
+    index, ia, ib, y, w = _encode(problems, comparisons)
 
     mu = np.array([rating_to_theta(grade_to_rating(p.seed_grade)) for p in problems])
     prior_var = (config.prior_sd * THETA_PER_RATING) ** 2
@@ -137,14 +139,14 @@ def fit_bradley_terry(
     else:
         res = minimize(
             _neg_log_post, x0, jac=True, method="L-BFGS-B", bounds=bounds,
-            args=(ia, ib, y, mu, prior_var, n, config.fit_tie_param, config.fixed_nu,
+            args=(ia, ib, y, w, mu, prior_var, n, config.fit_tie_param, config.fixed_nu,
                   config.log_nu_prior_mean, config.log_nu_prior_sd ** 2),
             options={"maxiter": 5000},
         )
         theta = res.x[:n]
         log_nu = res.x[n] if config.fit_tie_param else np.log(config.fixed_nu)
 
-    H = _hessian_theta(theta, log_nu, ia, ib, prior_var, n)
+    H = _hessian_theta(theta, log_nu, ia, ib, w, prior_var, n)
     cov_diag = np.diag(np.linalg.inv(H))
     sd_rating = np.sqrt(np.maximum(cov_diag, 0)) / THETA_PER_RATING
 

@@ -41,10 +41,13 @@ class Comparison:
     problem_b: str
     verdict: Verdict
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    weight: float = 1.0  # 1.0 = both problems climbed; < 1 when either was only attempted
 
     def __post_init__(self) -> None:
         if self.problem_a == self.problem_b:
             raise ValueError("cannot compare a problem with itself")
+        if not 0 < self.weight <= 1:
+            raise ValueError("weight must be in (0, 1]")
         if self.problem_a > self.problem_b:
             a, b = self.problem_a, self.problem_b
             object.__setattr__(self, "problem_a", b)

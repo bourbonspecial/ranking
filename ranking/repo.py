@@ -2,32 +2,39 @@
 
 Converts between ORM rows and the plain engine types in ranking.models,
 so the rating algorithms never touch SQLAlchemy.
+
+Ascents have a status: "done" (climbed) or "tried" (attempted, not climbed).
+A comparison's weight is derived here, at read time, from the statuses of
+its two problems for that climber: 1.0 if both are done, else
+`attempt_weight`. So if a climber later sends a problem they had only
+tried, their old comparisons involving it are promoted automatically.
 """
 from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
 
-
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
-
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .bradley_terry import BradleyTerryConfig, fit_bradley_terry
 from .db import (
-    AscentRow, ClimberRow, ComparisonHistoryRow, ComparisonRow, ProblemRow,
-    RatingRunRow, RatingSnapshotRow,
+    ASCENT_DONE, ASCENT_TRIED, AscentRow, ClimberRow, ComparisonHistoryRow, ComparisonRow,
+    ProblemRow, RatingRunRow, RatingSnapshotRow,
 )
 from .elo import EloConfig, replay_elo
 from .models import Comparison, Problem, Verdict
-from .pairs import pair_queue, ranking_gate_threshold
+from .pairs import pair_kind, pair_queue, ranking_gate_threshold
 from .personal import personal_ranking
 from .result import RankingResult
 from .winrate import win_rate
 
 ALGORITHMS = ("bradley_terry", "elo", "win_rate")
+DEFAULT_ATTEMPT_WEIGHT = 0.4
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 # ---- conversions -----------------------------------------------------------
@@ -35,11 +42,6 @@ ALGORITHMS = ("bradley_terry", "elo", "win_rate")
 def to_problem(row: ProblemRow) -> Problem:
     return Problem(id=str(row.id), name=row.name, seed_grade=row.seed_grade,
                    area=row.crag, country=row.country, ascent_count=row.ascent_count)
-
-
-def to_comparison(row: ComparisonRow) -> Comparison:
-    return Comparison(str(row.climber_id), str(row.problem_a), str(row.problem_b),
-                      Verdict(row.verdict), row.updated_at)
 
 
 # ---- problems ---------------------------------------------------------------
@@ -67,27 +69,41 @@ def get_climber_by_email(s: Session, email: str) -> ClimberRow | None:
     return s.scalar(select(ClimberRow).where(ClimberRow.email == email.lower().strip()))
 
 
-def set_ascents(s: Session, climber_id: int, problem_ids: list[int]) -> None:
-    """Replace the climber's tick list. Comparisons on un-ticked problems are removed."""
-    want = set(problem_ids)
-    have = {a.problem_id for a in s.scalars(select(AscentRow).where(AscentRow.climber_id == climber_id))}
-    for pid in have - want:
-        s.query(AscentRow).filter_by(climber_id=climber_id, problem_id=pid).delete()
+def ascent_statuses(s: Session, climber_id: int) -> dict[int, str]:
+    """{problem_id: "done" | "tried"} for one climber."""
+    rows = s.scalars(select(AscentRow).where(AscentRow.climber_id == climber_id))
+    return {a.problem_id: a.status for a in rows}
+
+
+def set_ascents(s: Session, climber_id: int, done: list[int], tried: list[int] = ()) -> None:
+    """Replace the climber's list. A problem in both lists counts as done.
+
+    Problems removed entirely take their comparisons with them; a change of
+    status keeps comparisons (their weight is derived at read time).
+    """
+    want = {pid: ASCENT_TRIED for pid in tried}
+    want.update({pid: ASCENT_DONE for pid in done})
+    have = {a.problem_id: a for a in s.scalars(select(AscentRow).where(AscentRow.climber_id == climber_id))}
+    for pid in set(have) - set(want):
+        s.delete(have[pid])
         s.query(ComparisonRow).filter(
             ComparisonRow.climber_id == climber_id,
             (ComparisonRow.problem_a == pid) | (ComparisonRow.problem_b == pid),
         ).delete(synchronize_session=False)
-    for pid in want - have:
-        s.add(AscentRow(climber_id=climber_id, problem_id=pid))
+    for pid, status in want.items():
+        if pid in have:
+            have[pid].status = status
+        else:
+            s.add(AscentRow(climber_id=climber_id, problem_id=pid, status=status))
     s.flush()
 
 
-def ticked_problems(s: Session, climber_id: int) -> list[Problem]:
-    rows = s.scalars(
-        select(ProblemRow).join(AscentRow, AscentRow.problem_id == ProblemRow.id)
-        .where(AscentRow.climber_id == climber_id).order_by(ProblemRow.id)
-    )
-    return [to_problem(r) for r in rows]
+def ticked_problems(s: Session, climber_id: int, status: str | None = None) -> list[Problem]:
+    q = (select(ProblemRow).join(AscentRow, AscentRow.problem_id == ProblemRow.id)
+         .where(AscentRow.climber_id == climber_id).order_by(ProblemRow.id))
+    if status is not None:
+        q = q.where(AscentRow.status == status)
+    return [to_problem(r) for r in s.scalars(q)]
 
 
 # ---- comparisons ------------------------------------------------------------
@@ -98,9 +114,9 @@ def record_comparison(s: Session, climber_id: int, problem_a: int, problem_b: in
     at = at or _utcnow()
     canon = Comparison(str(climber_id), str(problem_a), str(problem_b), verdict, at)
     a, b = int(canon.problem_a), int(canon.problem_b)
-    ticked = {p.id for p in ticked_problems(s, climber_id)}
-    if canon.problem_a not in ticked or canon.problem_b not in ticked:
-        raise ValueError("climber has not ticked both problems")
+    statuses = ascent_statuses(s, climber_id)
+    if a not in statuses or b not in statuses:
+        raise ValueError("both problems must be on your list (climbed or tried)")
     row = s.scalar(select(ComparisonRow).where(
         ComparisonRow.climber_id == climber_id, ComparisonRow.problem_a == a, ComparisonRow.problem_b == b))
     if row is None:
@@ -116,48 +132,100 @@ def record_comparison(s: Session, climber_id: int, problem_a: int, problem_b: in
     return row
 
 
-def all_comparisons(s: Session) -> list[Comparison]:
-    rows = s.scalars(select(ComparisonRow).order_by(ComparisonRow.updated_at, ComparisonRow.id))
-    return [to_comparison(r) for r in rows]
+def _all_statuses(s: Session) -> dict[tuple[int, int], str]:
+    return {(a.climber_id, a.problem_id): a.status for a in s.scalars(select(AscentRow))}
 
 
-def climber_comparisons(s: Session, climber_id: int) -> list[ComparisonRow]:
-    return list(s.scalars(select(ComparisonRow).where(ComparisonRow.climber_id == climber_id)
-                          .order_by(ComparisonRow.updated_at.desc())))
+def comparison_kind(row: ComparisonRow, statuses: dict[tuple[int, int], str]) -> str:
+    both_done = (statuses.get((row.climber_id, row.problem_a)) == ASCENT_DONE
+                 and statuses.get((row.climber_id, row.problem_b)) == ASCENT_DONE)
+    return "done" if both_done else "attempt"
 
 
-def next_pairs(s: Session, climber_id: int, limit: int | None = None) -> list[tuple[Problem, Problem]]:
+def all_comparisons(s: Session, include_attempts: bool = True,
+                    attempt_weight: float = DEFAULT_ATTEMPT_WEIGHT) -> list[Comparison]:
+    """Live comparisons as engine objects, weighted by ascent status."""
+    statuses = _all_statuses(s)
+    out = []
+    for r in s.scalars(select(ComparisonRow).order_by(ComparisonRow.updated_at, ComparisonRow.id)):
+        kind = comparison_kind(r, statuses)
+        if kind == "attempt" and not include_attempts:
+            continue
+        out.append(Comparison(str(r.climber_id), str(r.problem_a), str(r.problem_b), Verdict(r.verdict),
+                              r.updated_at, weight=1.0 if kind == "done" else attempt_weight))
+    return out
+
+
+def climber_comparisons(s: Session, climber_id: int) -> list[tuple[ComparisonRow, str]]:
+    """(row, kind) for one climber, newest first."""
+    statuses = _all_statuses(s)
+    rows = s.scalars(select(ComparisonRow).where(ComparisonRow.climber_id == climber_id)
+                     .order_by(ComparisonRow.updated_at.desc()))
+    return [(r, comparison_kind(r, statuses)) for r in rows]
+
+
+def next_pairs(s: Session, climber_id: int, limit: int | None = None) -> list[tuple[Problem, Problem, str]]:
+    """Unanswered pairs for the compare flow: (a, b, "done" | "attempt"), done pairs first."""
     ticked = ticked_problems(s, climber_id)
     by_id = {p.id: p for p in ticked}
-    q = pair_queue(str(climber_id), ticked, all_comparisons(s))
+    tried = {str(pid) for pid, st in ascent_statuses(s, climber_id).items() if st == ASCENT_TRIED}
+    q = pair_queue(str(climber_id), ticked, all_comparisons(s), tried=tried)
     if limit is not None:
         q = q[:limit]
-    return [(by_id[a], by_id[b]) for a, b in q]
+    return [(by_id[a], by_id[b], pair_kind((a, b), tried)) for a, b in q]
+
+
+def progress(s: Session, climber_id: int) -> dict:
+    """Counts for the compare flow and the ranking gate.
+
+    The gate only counts comparisons between two climbed problems: you unlock
+    the list by comparing things you've done, not things you've tried.
+    """
+    statuses = ascent_statuses(s, climber_id)
+    n_done = sum(1 for st in statuses.values() if st == ASCENT_DONE)
+    n_tried = len(statuses) - n_done
+    n_done_pairs = n_done * (n_done - 1) // 2
+    n_all_pairs = len(statuses) * (len(statuses) - 1) // 2
+    kinds = [k for _, k in climber_comparisons(s, climber_id)]
+    done_answered = kinds.count("done")
+    attempt_answered = kinds.count("attempt")
+    required = ranking_gate_threshold(n_done)
+    return {
+        "n_done": n_done, "n_tried": n_tried,
+        "n_done_pairs": n_done_pairs, "n_done_answered": done_answered,
+        "n_attempt_pairs": n_all_pairs - n_done_pairs, "n_attempt_answered": attempt_answered,
+        "ranking_required": required, "ranking_unlocked": done_answered >= required,
+    }
 
 
 def can_view_ranking(s: Session, climber_id: int) -> tuple[bool, int, int]:
-    """(allowed, comparisons made, comparisons required)."""
-    n_ticked = len(ticked_problems(s, climber_id))
-    made = len(climber_comparisons(s, climber_id))
-    need = ranking_gate_threshold(n_ticked)
-    return made >= need, made, need
+    """(allowed, done comparisons made, comparisons required)."""
+    p = progress(s, climber_id)
+    return p["ranking_unlocked"], p["n_done_answered"], p["ranking_required"]
 
 
 # ---- ratings ----------------------------------------------------------------
 
-def compute(s: Session, algorithm: str) -> RankingResult:
-    problems, comps = all_problems(s), all_comparisons(s)
+def compute(s: Session, algorithm: str, include_attempts: bool = False,
+            attempt_weight: float = DEFAULT_ATTEMPT_WEIGHT) -> RankingResult:
+    problems = all_problems(s)
+    comps = all_comparisons(s, include_attempts=include_attempts, attempt_weight=attempt_weight)
     if algorithm == "bradley_terry":
-        return fit_bradley_terry(problems, comps, BradleyTerryConfig())
-    if algorithm == "elo":
-        return replay_elo(problems, comps, EloConfig())
-    if algorithm == "win_rate":
-        return win_rate(problems, comps)
-    raise ValueError(f"unknown algorithm {algorithm}")
+        result = fit_bradley_terry(problems, comps, BradleyTerryConfig())
+    elif algorithm == "elo":
+        result = replay_elo(problems, comps, EloConfig())
+    elif algorithm == "win_rate":
+        result = win_rate(problems, comps)
+    else:
+        raise ValueError(f"unknown algorithm {algorithm}")
+    result.params["include_attempts"] = include_attempts
+    result.params["attempt_weight"] = attempt_weight if include_attempts else None
+    return result
 
 
 def store_run(s: Session, result: RankingResult) -> RatingRunRow:
-    run = RatingRunRow(algorithm=result.algorithm, n_comparisons=result.params.get("n_comparisons", 0),
+    run = RatingRunRow(algorithm=result.algorithm, include_attempts=bool(result.params.get("include_attempts")),
+                       n_comparisons=result.params.get("n_comparisons", 0),
                        params_json=json.dumps(result.params, default=str))
     s.add(run)
     s.flush()
@@ -169,19 +237,25 @@ def store_run(s: Session, result: RankingResult) -> RatingRunRow:
     return run
 
 
-def recompute_all(s: Session) -> dict[str, RatingRunRow]:
-    runs = {a: store_run(s, compute(s, a)) for a in ALGORITHMS}
+def recompute_all(s: Session, attempt_weight: float = DEFAULT_ATTEMPT_WEIGHT) -> dict[tuple[str, bool], RatingRunRow]:
+    """Every algorithm, with and without attempt comparisons."""
+    runs = {}
+    for algo in ALGORITHMS:
+        for include in (False, True):
+            runs[(algo, include)] = store_run(s, compute(s, algo, include, attempt_weight))
     s.commit()
     return runs
 
 
-def latest_run(s: Session, algorithm: str) -> RatingRunRow | None:
-    return s.scalar(select(RatingRunRow).where(RatingRunRow.algorithm == algorithm)
+def latest_run(s: Session, algorithm: str, include_attempts: bool = False) -> RatingRunRow | None:
+    return s.scalar(select(RatingRunRow)
+                    .where(RatingRunRow.algorithm == algorithm, RatingRunRow.include_attempts == include_attempts)
                     .order_by(RatingRunRow.computed_at.desc(), RatingRunRow.id.desc()).limit(1))
 
 
-def latest_ranking(s: Session, algorithm: str = "bradley_terry") -> list[tuple[RatingSnapshotRow, ProblemRow]]:
-    run = latest_run(s, algorithm)
+def latest_ranking(s: Session, algorithm: str = "bradley_terry",
+                   include_attempts: bool = False) -> list[tuple[RatingSnapshotRow, ProblemRow]]:
+    run = latest_run(s, algorithm, include_attempts)
     if run is None:
         return []
     rows = s.execute(
@@ -191,5 +265,6 @@ def latest_ranking(s: Session, algorithm: str = "bradley_terry") -> list[tuple[R
     return [(snap, prob) for snap, prob in rows]
 
 
-def personal(s: Session, climber_id: int) -> RankingResult:
-    return personal_ranking(str(climber_id), ticked_problems(s, climber_id), all_comparisons(s))
+def personal(s: Session, climber_id: int, attempt_weight: float = DEFAULT_ATTEMPT_WEIGHT) -> RankingResult:
+    return personal_ranking(str(climber_id), ticked_problems(s, climber_id),
+                            all_comparisons(s, include_attempts=True, attempt_weight=attempt_weight))

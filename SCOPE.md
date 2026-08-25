@@ -35,8 +35,22 @@ later as an afterthought.
 ### Climber (user)
 - `id`, `name` (real name, visible to members), `email`
 - `status`: requested → invited → active
-- Eligibility: **≥2 ascents at 8C or harder** (i.e. at least one possible pair)
-- `ascents`: set of Problem ids ticked by the climber
+- Eligibility: **≥2 climbed ascents at 8C+ or harder** (i.e. at least one possible pair)
+- `ascents`: Problem ids on the climber's list, each **done** (climbed) or
+  **tried** (attempted, not climbed)
+
+### Attempts
+Climbers may also list problems they have tried but not done, and compare
+them against problems they have climbed. A comparison involving a tried
+problem is an *attempt comparison*:
+- Offered only after every done–done pair is answered, and only if the
+  climber opts in.
+- Weighted at `attempt_weight` (default **0.4**, `RANKING_ATTEMPT_WEIGHT`)
+  in every algorithm; the weight is derived at compute time from current
+  statuses, so sending a tried problem promotes its old comparisons.
+- Never counts towards the ranking gate.
+- Rankings are stored in two variants — done-only and with attempts — and
+  members toggle between them on the list.
 
 ### Comparison
 - `climber_id`, `problem_a_id`, `problem_b_id` (stored canonically, a < b)

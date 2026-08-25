@@ -10,9 +10,10 @@ from .. import repo
 
 
 class Recomputer:
-    def __init__(self, session_factory: sessionmaker, debounce: float):
+    def __init__(self, session_factory: sessionmaker, debounce: float, attempt_weight: float = 0.4):
         self.session_factory = session_factory
         self.debounce = debounce
+        self.attempt_weight = attempt_weight
         self._timer: threading.Timer | None = None
         self._lock = threading.Lock()
 
@@ -31,7 +32,7 @@ class Recomputer:
         with self._lock:
             self._timer = None
         with self.session_factory() as s:
-            repo.recompute_all(s)
+            repo.recompute_all(s, self.attempt_weight)
 
     def shutdown(self) -> None:
         with self._lock:
