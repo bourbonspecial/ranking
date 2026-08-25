@@ -160,7 +160,7 @@ def init_local_db(seed: Path = SEED_DB, local: Path = LOCAL_DB, force: bool = Fa
     """Copy the committed seed DB to the gitignored local DB if it doesn't exist."""
     if not seed.exists():
         raise FileNotFoundError(f"seed database missing: {seed} (run `ranking db build-seed`)")
-    if local.exists() and not force:
-        return local
-    shutil.copyfile(seed, local)
+    if not local.exists() or force:
+        shutil.copyfile(seed, local)
+    create_schema(local)  # idempotent: adds any tables introduced since the copy was made
     return local

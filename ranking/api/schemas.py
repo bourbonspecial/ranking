@@ -24,6 +24,7 @@ class ClimberOut(BaseModel):
     is_admin: bool
     n_ascents: int = 0
     n_comparisons: int = 0
+    request_note: str = ""
 
 
 class InviteRequestIn(BaseModel):

@@ -30,7 +30,7 @@ def climber_out(s: Session, c: ClimberRow) -> ClimberOut:
     n_asc = s.scalar(select(func.count()).select_from(AscentRow).where(AscentRow.climber_id == c.id)) or 0
     n_cmp = s.scalar(select(func.count()).select_from(ComparisonRow).where(ComparisonRow.climber_id == c.id)) or 0
     return ClimberOut(id=c.id, name=c.name, email=c.email, status=c.status, is_admin=c.is_admin,
-                      n_ascents=n_asc, n_comparisons=n_cmp)
+                      n_ascents=n_asc, n_comparisons=n_cmp, request_note=c.request_note or "")
 
 
 # ---- public -----------------------------------------------------------------
@@ -185,7 +185,7 @@ def climbers(status: str | None = None, s: Session = Depends(get_db)):
 
 
 def _invite(s: Session, settings, mailer, climber: ClimberRow) -> None:
-    if climber.status == "requested":
+    if climber.status in ("requested", "deactivated"):
         climber.status = "invited"
     url = auth.create_magic_link(s, settings, climber)
     mailer.magic_link(climber.email, climber.name, url, invite=True)
@@ -197,8 +197,6 @@ def invite_existing(climber_id: int, s: Session = Depends(get_db), settings=Depe
     c = s.get(ClimberRow, climber_id)
     if c is None:
         raise HTTPException(404)
-    if c.status == "deactivated":
-        raise HTTPException(400, "climber is deactivated")
     _invite(s, settings, mailer, c)
     return climber_out(s, c)
 

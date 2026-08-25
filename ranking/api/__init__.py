@@ -4,8 +4,10 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
-from ..db import LOCAL_DB, init_local_db, make_session_factory
+from ..db import LOCAL_DB, REPO_ROOT, init_local_db, make_session_factory
 from .email import Mailer
 from .recompute import Recomputer
 from .routes import admin, member, public
@@ -30,4 +32,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(public)
     app.include_router(member)
     app.include_router(admin)
+    mount_frontend(app)
     return app
+
+
+FRONTEND_DIST = REPO_ROOT / "frontend" / "dist"
+
+
+def mount_frontend(app: FastAPI, dist: Path = FRONTEND_DIST) -> None:
+    """Serve the built SPA; unknown non-API paths fall back to index.html."""
+    if not (dist / "index.html").exists():
+        return
+    app.mount("/assets", StaticFiles(directory=dist / "assets"), name="assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def spa(path: str):
+        candidate = dist / path
+        if path and candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(dist / "index.html")

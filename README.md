@@ -45,6 +45,20 @@ public address; `RANKING_ADMIN_EMAILS` for emails that become admins on first si
 
 Ratings are recomputed in the background ~20s after the last comparison (`RANKING_RECOMPUTE_DEBOUNCE`).
 
+## Phase 3: frontend
+
+Vite + Svelte 5 SPA in `frontend/`, served by FastAPI from `frontend/dist` (built output is
+gitignored — run the build before `ranking serve`).
+
+```
+cd frontend && npm install && npm run build     # production build -> dist/
+cd frontend && npm run dev                       # dev server on :5173, proxies /api to :8000
+```
+
+Pages: landing (invite request / sign-in), My ascents, Compare (← ↓ → keys, `s` to skip),
+My answers (revise inline), The list (gated; algorithm + grade filters), Profile (personal
+ordering vs global), Admin (invite queue, direct invite, recompute).
+
 ## Phase 1: rating engine
 
 ```
