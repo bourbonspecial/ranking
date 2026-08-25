@@ -7,6 +7,8 @@
     ranking db init [--force]      copy seed -> data/local.sqlite (gitignored)
     ranking recompute [--db PATH]  fit every algorithm and store a snapshot
     ranking list [--algo A] [--db PATH]   print the latest stored ranking
+    ranking serve [--host H] [--port P] [--reload]   run the API (env: RANKING_* see api/settings.py)
+    ranking admin EMAIL [--name NAME]     create/promote an active admin in the local db
 
 problems.csv columns:    id,name,seed_grade[,area,country,ascent_count]
 comparisons.csv columns: climber_id,problem_a,problem_b,verdict[,created_at]
@@ -103,8 +105,36 @@ def main(argv=None) -> None:
     ls.add_argument("--algo", default="bradley_terry", choices=["bradley_terry", "elo", "win_rate"])
     ls.add_argument("--db", default=None)
 
+    sv = sub.add_parser("serve")
+    sv.add_argument("--host", default="127.0.0.1")
+    sv.add_argument("--port", type=int, default=8000)
+    sv.add_argument("--reload", action="store_true")
+
+    ad = sub.add_parser("admin")
+    ad.add_argument("email")
+    ad.add_argument("--name", default=None)
+    ad.add_argument("--db", default=None)
+
     a = p.parse_args(argv)
-    if a.cmd == "db":
+    if a.cmd == "serve":
+        import uvicorn
+        uvicorn.run("ranking.api.main:app", host=a.host, port=a.port, reload=a.reload)
+    elif a.cmd == "admin":
+        from pathlib import Path
+        from .db import init_local_db, make_session_factory
+        from . import repo
+        db_path = Path(a.db) if a.db else init_local_db()
+        with make_session_factory(db_path)() as s:
+            c = repo.get_climber_by_email(s, a.email)
+            if c is None:
+                c = repo.add_climber(s, a.name or a.email.split("@")[0], a.email, status="active", is_admin=True)
+            else:
+                c.is_admin, c.status = True, "active"
+                if a.name:
+                    c.name = a.name
+            s.commit()
+            print(f"admin: {c.name} <{c.email}> (id {c.id})")
+    elif a.cmd == "db":
         from .db import LOCAL_DB, SEED_DB, init_local_db
         from .importer import build_seed_db
         if a.dbcmd == "build-seed":

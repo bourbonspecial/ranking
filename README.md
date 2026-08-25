@@ -20,6 +20,31 @@ Schema (`ranking/db.py`): problems, climbers, ascents, comparisons (live, one pe
 climber-pair), comparison_history (audit only), rating_runs, rating_snapshots.
 `ranking/repo.py` is the repository layer the API will sit on.
 
+## Phase 2: API
+
+```
+.venv/bin/ranking admin you@example.com --name "You"   # make yourself an admin in local.sqlite
+.venv/bin/ranking serve --reload                        # http://127.0.0.1:8000/docs
+```
+
+Then `POST /api/auth/request-link {"email": ...}` — in dev the magic link is printed to the
+server console (`RANKING_EMAIL_BACKEND=console`, the default). Set `RANKING_EMAIL_BACKEND=smtp`
+plus `RANKING_SMTP_*` / `RANKING_EMAIL_FROM` to send real mail; `RANKING_BASE_URL` for the
+public address; `RANKING_ADMIN_EMAILS` for emails that become admins on first sign-in.
+
+| route | who | what |
+|---|---|---|
+| `POST /api/invite-requests` | anyone | ask for an invite (name, email, note) |
+| `POST /api/auth/request-link` · `GET /api/auth/callback` · `POST /api/auth/logout` · `GET /api/me` | anyone | magic-link auth |
+| `GET /api/problems` | member | master list |
+| `GET/PUT /api/me/ascents` · `GET /api/me/progress` | member | tick list and ranking-gate progress |
+| `GET /api/me/pairs` · `POST /api/me/comparisons` · `GET /api/me/comparisons` | member | compare flow; posting an already-answered pair revises it |
+| `GET /api/ranking?algo=` | member (gated) | latest stored ranking; `bradley_terry` / `elo` / `win_rate` |
+| `GET /api/me/ranking` | member | personal ranking with global rank alongside |
+| `GET /api/admin/climbers?status=` · `POST /api/admin/climbers/{id}/invite` · `POST /api/admin/invite` · `POST /api/admin/climbers/{id}/reject` · `POST /api/admin/climbers/{id}/admin` · `POST /api/admin/recompute` | admin | invite queue and tooling |
+
+Ratings are recomputed in the background ~20s after the last comparison (`RANKING_RECOMPUTE_DEBOUNCE`).
+
 ## Phase 1: rating engine
 
 ```

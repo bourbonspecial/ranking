@@ -100,6 +100,22 @@ class ComparisonHistoryRow(Base):
     recorded_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
 
+class MagicLinkRow(Base):
+    __tablename__ = "magic_links"
+    token_hash: Mapped[str] = mapped_column(String, primary_key=True)
+    climber_id: Mapped[int] = mapped_column(ForeignKey("climbers.id"), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class SessionRow(Base):
+    __tablename__ = "sessions"
+    token_hash: Mapped[str] = mapped_column(String, primary_key=True)
+    climber_id: Mapped[int] = mapped_column(ForeignKey("climbers.id"), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+
 class RatingRunRow(Base):
     __tablename__ = "rating_runs"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
