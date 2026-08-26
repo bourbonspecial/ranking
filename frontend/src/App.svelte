@@ -13,6 +13,8 @@
   import Logo from './lib/Logo.svelte'
 
   refreshMe()
+  let menuOpen = $state(false)
+  $effect(() => { route.path; menuOpen = false })  // close on navigation
 
   const memberPages = { '/ticks': Ticks, '/compare': Compare, '/mine': MyComparisons, '/ranking': Ranking, '/profile': Profile }
   const links = [['/ranking', 'The list'], ['/compare', 'Compare'], ['/ticks', 'My ascents'], ['/mine', 'My answers'], ['/profile', 'Profile']]
@@ -28,13 +30,18 @@
 </script>
 
 {#if session.me}
-  <nav class="top">
+  <nav class="top" class:open={menuOpen}>
     <a href="/" class="brand"><Logo size={22} /> The List</a>
-    {#each links as [href, label]}
-      <a {href} class:active={route.path === href}>{label}</a>
-    {/each}
-    {#if session.me.is_admin}<a href="/admin" class:active={route.path === '/admin'}>Admin</a>{/if}
-    <button class="ghost small" onclick={logout}>Sign out</button>
+    <button class="ghost burger" aria-label={menuOpen ? 'Close menu' : 'Open menu'} aria-expanded={menuOpen} onclick={() => (menuOpen = !menuOpen)}>
+      <span></span><span></span><span></span>
+    </button>
+    <div class="links">
+      {#each links as [href, label]}
+        <a {href} class:active={route.path === href}>{label}</a>
+      {/each}
+      {#if session.me.is_admin}<a href="/admin" class:active={route.path === '/admin'}>Admin</a>{/if}
+      <button class="ghost small" onclick={logout}>Sign out</button>
+    </div>
   </nav>
 {/if}
 
