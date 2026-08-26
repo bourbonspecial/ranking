@@ -1,5 +1,6 @@
 <script>
   import { api } from '../lib/api.js'
+  import Logo from '../lib/Logo.svelte'
   let mode = $state('request') // request | signin
   let name = $state(''), email = $state(''), note = $state('')
   let done = $state(false), err = $state(''), busy = $state(false)
@@ -16,7 +17,8 @@
 
 <div class="landing">
   <div class="inner">
-    <div class="eyebrow">8C and above · by invitation</div>
+    <div class="mark"><Logo size={56} bg={true} /></div>
+    <div class="eyebrow">The List · 8C and above · by invitation</div>
     <h1>Some of them are harder than the grade says.<br/>You already know which.</h1>
     <p class="lede">
       A single ordering of the world's hardest boulder problems, built one question at a time
@@ -82,6 +84,8 @@
   .landing { min-height: calc(100vh - 6rem); display: grid; place-items: start center; padding: 3rem 1.25rem 4rem; background:
     radial-gradient(ellipse at 20% 0%, #1a1608 0%, transparent 55%), var(--bg); }
   .inner { max-width: 640px; width: 100%; }
+  .mark { margin-bottom: 1.25rem; }
+  .mark :global(svg) { border-radius: 14px; box-shadow: 0 0 0 1px var(--line), 0 12px 40px -12px rgba(224,176,74,.45); }
   .eyebrow { font-size: .75rem; letter-spacing: .18em; text-transform: uppercase; color: var(--accent); margin-bottom: 1.25rem; }
   h1 { font-size: clamp(1.6rem, 4vw, 2.4rem); line-height: 1.15; margin-bottom: 1.25rem; }
   .lede { font-size: 1.05rem; }

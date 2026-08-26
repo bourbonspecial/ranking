@@ -4,6 +4,7 @@
   import { session } from '../lib/session.svelte.js'
   import PersonalTable from '../lib/PersonalTable.svelte'
   import Problem from '../lib/Problem.svelte'
+  import Logo from '../lib/Logo.svelte'
   let data = $state(null), err = $state('')
   let id = $derived(route.path.split('/')[2])
   $effect(() => { load(id) })
@@ -15,7 +16,7 @@
 </script>
 
 <div class="container">
-  {#if !session.me}<p class="small"><a href="/" class="brandlink">The List</a></p>{/if}
+  {#if !session.me}<p class="small"><a href="/" class="brandlink"><Logo size={18} /> The List</a></p>{/if}
   {#if err}<h1>Hmm.</h1><p class="muted">{err}</p>
   {:else if data}
     <div class="eyebrow">Personal ordering</div>

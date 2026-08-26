@@ -24,7 +24,7 @@ label { display: block; font-size: .85rem; color: var(--fg2); margin-bottom: .25
 .field { margin-bottom: 1rem; }
 .container { max-width: 1040px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
 nav.top { display: flex; gap: 1.25rem; align-items: center; padding: .9rem 1.25rem; border-bottom: 1px solid var(--line); background: var(--bg); position: sticky; top: 0; z-index: 5; }
-nav.top .brand { font-weight: 600; letter-spacing: .12em; text-transform: uppercase; font-size: .8rem; color: var(--accent); margin-right: auto; }
+nav.top .brand { display: inline-flex; align-items: center; gap: .55rem; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; font-size: .8rem; color: var(--accent); margin-right: auto; }
 nav.top a { color: var(--fg2); font-size: .95rem; } nav.top a.active { color: var(--fg); }
 nav.top .spacer { flex: 1; }
 table { width: 100%; border-collapse: collapse; font-size: .95rem; }

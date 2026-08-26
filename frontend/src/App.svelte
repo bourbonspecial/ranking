@@ -10,6 +10,7 @@
   import Admin from './pages/Admin.svelte'
   import PublicProfile from './pages/PublicProfile.svelte'
   import Footer from './lib/Footer.svelte'
+  import Logo from './lib/Logo.svelte'
 
   refreshMe()
 
@@ -28,7 +29,7 @@
 
 {#if session.me}
   <nav class="top">
-    <a href="/" class="brand">The List</a>
+    <a href="/" class="brand"><Logo size={22} /> The List</a>
     {#each links as [href, label]}
       <a {href} class:active={route.path === href}>{label}</a>
     {/each}
