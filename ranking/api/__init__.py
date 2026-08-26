@@ -24,6 +24,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         yield
         app.state.recomputer.shutdown()
 
+    _ensure_admins(session_factory, settings.admin_emails)
+
     app = FastAPI(title="Boulder Ranking", lifespan=lifespan)
     app.state.settings = settings
     app.state.session_factory = session_factory
@@ -51,3 +53,16 @@ def mount_frontend(app: FastAPI, dist: Path = FRONTEND_DIST) -> None:
         if path and candidate.is_file():
             return FileResponse(candidate)
         return FileResponse(dist / "index.html")
+
+
+def _ensure_admins(session_factory, emails: list[str]) -> None:
+    """Configured admin emails are admins even if their account predates the config."""
+    from sqlalchemy import select
+    from ..db import ClimberRow
+    if not emails:
+        return
+    with session_factory() as s:
+        for c in s.scalars(select(ClimberRow).where(ClimberRow.email.in_(emails))):
+            if not c.is_admin:
+                c.is_admin = True
+        s.commit()

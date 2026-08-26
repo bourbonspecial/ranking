@@ -38,9 +38,13 @@ climber-pair), comparison_history (audit only), rating_runs, rating_snapshots.
 ```
 
 Then `POST /api/auth/request-link {"email": ...}` — in dev the magic link is printed to the
-server console (`RANKING_EMAIL_BACKEND=console`, the default). Set `RANKING_EMAIL_BACKEND=smtp`
-plus `RANKING_SMTP_*` / `RANKING_EMAIL_FROM` to send real mail; `RANKING_BASE_URL` for the
-public address; `RANKING_ADMIN_EMAILS` for emails that become admins on first sign-in.
+server console (`RANKING_EMAIL_BACKEND=console`, the default).
+
+Configuration lives in `.env` (gitignored; `start.sh` loads it). Copy `.env.example` and fill in
+the Resend API key to send real mail via SMTP. `RANKING_BASE_URL` is embedded in every magic
+link. `remknowles@gmail.com` and `alexander.gradenegger@gmail.com` are always admins
+(`DEFAULT_ADMIN_EMAILS`); add more via `RANKING_ADMIN_EMAILS` or the admin panel's "Make admin".
+An invited member receives a welcome email the first time they sign in.
 
 | route | who | what |
 |---|---|---|

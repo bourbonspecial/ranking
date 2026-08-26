@@ -84,9 +84,12 @@ def request_link(body: EmailIn, s: Session = Depends(get_db), settings=Depends(g
 
 
 @public.get("/auth/callback")
-def auth_callback(token: str, s: Session = Depends(get_db), settings=Depends(get_settings)):
-    climber = auth.consume_magic_link(s, token)
+def auth_callback(token: str, s: Session = Depends(get_db), settings=Depends(get_settings),
+                  mailer=Depends(get_mailer)):
+    climber, activated = auth.consume_magic_link(s, token)
     session_token = auth.create_session(s, settings, climber)
+    if activated:
+        mailer.welcome(climber.email, climber.name, settings.base_url)
     resp = RedirectResponse(url="/", status_code=303)
     resp.set_cookie(auth.COOKIE, session_token, httponly=True, samesite="lax", secure=settings.cookie_secure,
                     max_age=settings.session_ttl_days * 86400)

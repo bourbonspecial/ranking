@@ -19,6 +19,16 @@ done
 
 step() { printf '\n\033[1;33m▸ %s\033[0m\n' "$*"; }
 
+if [ -f .env ]; then
+  step "Loading .env"
+  set -a; # export everything sourced
+  # shellcheck disable=SC1091
+  . ./.env
+  set +a
+  [ -z "${RANKING_SMTP_PASSWORD:-}" ] && [ "${RANKING_EMAIL_BACKEND:-console}" = smtp ] && \
+    echo "warning: RANKING_EMAIL_BACKEND=smtp but RANKING_SMTP_PASSWORD is empty - falling back to console" && export RANKING_EMAIL_BACKEND=console
+fi
+
 step "Python environment"
 command -v uv >/dev/null || { echo "uv not found: https://docs.astral.sh/uv/"; exit 1; }
 [ -d .venv ] || uv venv -p 3.12 -q
@@ -39,6 +49,6 @@ if [ "$DEV" = 1 ]; then
 fi
 
 step "API + app → http://localhost:8000"
-echo "Sign-in links are printed here (RANKING_EMAIL_BACKEND=console). Ctrl-C to stop."
+if [ "${RANKING_EMAIL_BACKEND:-console}" = console ]; then echo "Sign-in links are printed here (RANKING_EMAIL_BACKEND=console). Ctrl-C to stop."; else echo "Email via SMTP ${RANKING_SMTP_HOST:-}. Ctrl-C to stop."; fi
 [ "$DEV" = 1 ] && trap 'pkill -f "vite" 2>/dev/null || true' EXIT
 exec .venv/bin/ranking serve --host 127.0.0.1 --port 8000

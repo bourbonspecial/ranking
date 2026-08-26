@@ -36,3 +36,17 @@ class Mailer:
             subject = "Your sign-in link"
             body = f"{name},\n\nSign in here (valid for {self.settings.magic_link_ttl_minutes} minutes):\n{url}\n"
         self.send(to, subject, body)
+
+    def welcome(self, to: str, name: str, base_url: str) -> None:
+        body = (
+            f"{name},\n\n"
+            "You're in. Welcome to The List.\n\n"
+            "Getting started takes a few minutes:\n\n"
+            f"  1. Tick what you've climbed (and, if you like, what you've tried):\n     {base_url}/ticks\n\n"
+            f"  2. Answer a few quick questions - which was harder for you?\n     {base_url}/compare\n\n"
+            "  3. After ten answers the list unlocks.\n\n"
+            "Your individual answers are private. Your own ordering is private too unless you choose\n"
+            "to make it public from your profile.\n\n"
+            f"Sign in any time by requesting a link at {base_url}\n"
+        )
+        self.send(to, "Welcome to The List", body)

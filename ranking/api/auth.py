@@ -32,7 +32,8 @@ def create_magic_link(s: Session, settings: Settings, climber: ClimberRow) -> st
     return f"{settings.base_url}/api/auth/callback?token={token}"
 
 
-def consume_magic_link(s: Session, token: str) -> ClimberRow:
+def consume_magic_link(s: Session, token: str) -> tuple[ClimberRow, bool]:
+    """Returns (climber, activated) - activated is True the first time an invited climber signs in."""
     row = s.get(MagicLinkRow, _hash(token))
     if row is None or row.used_at is not None or row.expires_at < _now():
         raise HTTPException(400, "This sign-in link is invalid or has expired.")
@@ -40,10 +41,11 @@ def consume_magic_link(s: Session, token: str) -> ClimberRow:
     if climber is None or climber.status == "deactivated":
         raise HTTPException(403, "Account is not active.")
     row.used_at = _now()
-    if climber.status == "invited":
+    activated = climber.status == "invited"
+    if activated:
         climber.status = "active"
     s.flush()
-    return climber
+    return climber, activated
 
 
 def create_session(s: Session, settings: Settings, climber: ClimberRow) -> str:

@@ -71,8 +71,18 @@ def test_invite_request_then_admin_invite_then_member_flow(app, anon, admin):
     # 3. member follows the invite link and is active
     nalle = TestClient(app, base_url="http://localhost:8000", follow_redirects=False)
     url = re.search(r"http://\S+", app.state.mailer.sent[-1]["body"]).group(0)
+    n_sent = len(app.state.mailer.sent)
     assert nalle.get(url).status_code == 303
+    welcome = app.state.mailer.sent[-1]
+    assert len(app.state.mailer.sent) == n_sent + 1 and welcome["subject"] == "Welcome to The List"
+    assert welcome["to"] == "nalle@example.com" and "/compare" in welcome["body"]
     assert nalle.get(url).status_code == 400  # single use
+    # signing in again later does not re-send the welcome
+    nalle.post("/api/auth/request-link", json={"email": "nalle@example.com"})
+    again = re.search(r"http://\S+", app.state.mailer.sent[-1]["body"]).group(0)
+    n_sent = len(app.state.mailer.sent)
+    assert nalle.get(again).status_code == 303
+    assert len(app.state.mailer.sent) == n_sent
     me = nalle.get("/api/me").json()
     assert me["status"] == "active" and me["is_admin"] is False
     assert nalle.get("/api/admin/climbers").status_code == 403
@@ -154,3 +164,23 @@ def test_admin_direct_invite_and_reject(app, admin):
     assert admin.post("/api/admin/recompute").json() == {"ok": True}
     # admin can see the ranking without the gate
     assert admin.get("/api/ranking").status_code == 200
+
+
+def test_default_admins_and_startup_promotion(tmp_path):
+    from ranking import repo
+    from ranking.api.settings import DEFAULT_ADMIN_EMAILS
+    from ranking.db import make_session_factory
+    db = tmp_path / "t.sqlite"
+    build_seed_db(PROBLEMS_CSV, db)
+    # an account that existed before it was configured as admin
+    with make_session_factory(db)() as s:
+        repo.add_climber(s, "Rem", DEFAULT_ADMIN_EMAILS[0], status="active", is_admin=False)
+        s.commit()
+    settings = Settings(db_path=db, recompute_debounce_seconds=0)
+    assert set(DEFAULT_ADMIN_EMAILS) <= set(settings.admin_emails)
+    app = create_app(settings)
+    with make_session_factory(db)() as s:
+        assert repo.get_climber_by_email(s, DEFAULT_ADMIN_EMAILS[0]).is_admin is True
+    # the other default admin can sign in without an invite and arrives as admin
+    client = sign_in(app, DEFAULT_ADMIN_EMAILS[1])
+    assert client.get("/api/me").json()["is_admin"] is True

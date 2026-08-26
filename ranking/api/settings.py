@@ -5,6 +5,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 
+# Always admins, regardless of environment. Others can be promoted from the admin panel
+# or listed in RANKING_ADMIN_EMAILS.
+DEFAULT_ADMIN_EMAILS = ["remknowles@gmail.com", "alexander.gradenegger@gmail.com"]
+
+
 @dataclass
 class Settings:
     db_path: Path | None = None               # None -> data/local.sqlite (created from seed)
@@ -15,7 +20,7 @@ class Settings:
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_password: str = ""
-    admin_emails: list[str] = field(default_factory=list)  # auto-provisioned as admins on first login
+    admin_emails: list[str] = field(default_factory=lambda: list(DEFAULT_ADMIN_EMAILS))  # admins; provisioned on first login
     magic_link_ttl_minutes: int = 30
     session_ttl_days: int = 90
     recompute_debounce_seconds: float = 20.0
@@ -34,7 +39,8 @@ class Settings:
             smtp_port=int(e("RANKING_SMTP_PORT", "587")),
             smtp_user=e("RANKING_SMTP_USER", ""),
             smtp_password=e("RANKING_SMTP_PASSWORD", ""),
-            admin_emails=[x.strip().lower() for x in e("RANKING_ADMIN_EMAILS", "").split(",") if x.strip()],
+            admin_emails=sorted({*DEFAULT_ADMIN_EMAILS,
+                                 *[x.strip().lower() for x in e("RANKING_ADMIN_EMAILS", "").split(",") if x.strip()]}),
             recompute_debounce_seconds=float(e("RANKING_RECOMPUTE_DEBOUNCE", "20")),
             attempt_weight=float(e("RANKING_ATTEMPT_WEIGHT", "0.4")),
             cookie_secure=e("RANKING_COOKIE_SECURE", "0") == "1",
