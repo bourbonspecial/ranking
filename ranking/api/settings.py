@@ -10,6 +10,27 @@ from pathlib import Path
 DEFAULT_ADMIN_EMAILS = ["remknowles@gmail.com", "alexander.gradenegger@gmail.com"]
 
 
+@dataclass(frozen=True)
+class RateLimit:
+    """At most `requests` in any sliding window of `window_seconds`."""
+    requests: int
+    window_seconds: float
+
+    @classmethod
+    def from_env(cls, prefix: str, requests: int, window_seconds: float) -> "RateLimit":
+        e = os.environ.get
+        return cls(int(e(f"{prefix}_RATE_LIMIT", str(requests))),
+                   float(e(f"{prefix}_RATE_WINDOW", str(window_seconds))))
+
+
+# name -> default. Names are what routes pass to `rate_limited(...)`.
+DEFAULT_RATE_LIMITS = {
+    "magic_link": RateLimit(5, 900.0),    # per IP, and per email (silently dropped)
+    "invite": RateLimit(10, 3600.0),      # per IP and per email
+    "suggestion": RateLimit(5, 3600.0),   # per member
+}
+
+
 @dataclass
 class Settings:
     db_path: Path | None = None               # None -> data/local.sqlite (created from seed)
@@ -23,6 +44,7 @@ class Settings:
     admin_emails: list[str] = field(default_factory=lambda: list(DEFAULT_ADMIN_EMAILS))  # admins; provisioned on first login
     magic_link_ttl_minutes: int = 30
     session_ttl_days: int = 90
+    rate_limits: dict[str, RateLimit] = field(default_factory=lambda: dict(DEFAULT_RATE_LIMITS))
     recompute_debounce_seconds: float = 20.0
     attempt_weight: float = 0.4               # weight of a comparison involving a problem only attempted
     cookie_secure: bool = False
@@ -41,6 +63,8 @@ class Settings:
             smtp_password=e("RANKING_SMTP_PASSWORD", ""),
             admin_emails=sorted({*DEFAULT_ADMIN_EMAILS,
                                  *[x.strip().lower() for x in e("RANKING_ADMIN_EMAILS", "").split(",") if x.strip()]}),
+            rate_limits={name: RateLimit.from_env(f"RANKING_{name.upper()}", d.requests, d.window_seconds)
+                         for name, d in DEFAULT_RATE_LIMITS.items()},
             recompute_debounce_seconds=float(e("RANKING_RECOMPUTE_DEBOUNCE", "20")),
             attempt_weight=float(e("RANKING_ATTEMPT_WEIGHT", "0.4")),
             cookie_secure=e("RANKING_COOKIE_SECURE", "0") == "1",

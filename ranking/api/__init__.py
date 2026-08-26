@@ -9,9 +9,10 @@ from fastapi.staticfiles import StaticFiles
 
 from ..db import LOCAL_DB, REPO_ROOT, init_local_db, make_session_factory
 from .email import Mailer
+from .rate_limit import SlidingWindowRateLimiter
 from .recompute import Recomputer
 from .routes import admin, member, public
-from .settings import Settings
+from .settings import DEFAULT_RATE_LIMITS, Settings
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -30,6 +31,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.session_factory = session_factory
     app.state.mailer = Mailer(settings)
+    app.state.limiters = {name: SlidingWindowRateLimiter(rl.requests, rl.window_seconds)
+                          for name, rl in {**DEFAULT_RATE_LIMITS, **settings.rate_limits}.items()}
     app.state.recomputer = Recomputer(session_factory, settings.recompute_debounce_seconds, settings.attempt_weight)
     app.include_router(public)
     app.include_router(member)

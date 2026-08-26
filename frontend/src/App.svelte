@@ -29,24 +29,33 @@
   })
 </script>
 
-{#if session.me}
-  <nav class="top" class:open={menuOpen}>
-    <a href="/" class="brand"><Logo size={22} /> The List{#if session.me.is_test} <span class="pill test">test</span>{/if}</a>
-    <button class="ghost burger" aria-label={menuOpen ? 'Close menu' : 'Open menu'} aria-expanded={menuOpen} onclick={() => (menuOpen = !menuOpen)}>
-      <span></span><span></span><span></span>
-    </button>
-    <div class="links">
-      {#each links as [href, label]}
-        <a {href} class:active={route.path === href}>{label}</a>
-      {/each}
-      {#if session.me.is_admin}<a href="/admin" class:active={route.path === '/admin'}>Admin</a>{/if}
-      <button class="ghost small" onclick={logout}>Sign out</button>
-    </div>
-  </nav>
-{/if}
+<div class="app-shell">
+  {#if session.me}
+    <nav class="top" class:open={menuOpen}>
+      <a href="/" class="brand"><Logo size={22} /> The List{#if session.me.is_test} <span class="pill test">test</span>{/if}</a>
+      <button class="ghost burger" aria-label={menuOpen ? 'Close menu' : 'Open menu'} aria-expanded={menuOpen} onclick={() => (menuOpen = !menuOpen)}>
+        <span></span><span></span><span></span>
+      </button>
+      <div class="links">
+        {#each links as [href, label]}
+          <a {href} class:active={route.path === href}>{label}</a>
+        {/each}
+        {#if session.me.is_admin}<a href="/admin" class:active={route.path === '/admin'}>Admin</a>{/if}
+        <button class="ghost small" onclick={logout}>Sign out</button>
+      </div>
+    </nav>
+  {/if}
 
-{#if page}
-  {@const Page = page}
-  <Page />
-  <Footer />
-{/if}
+  {#if page}
+    {@const Page = page}
+    <main class="app-main">
+      <Page />
+    </main>
+    <Footer />
+  {/if}
+</div>
+
+<style>
+  .app-shell { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
+  .app-main { flex: 1 0 auto; min-width: 0; }
+</style>

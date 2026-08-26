@@ -27,6 +27,22 @@
   let nTried = $derived(Object.values(status).filter(v => v === 'tried').length)
   let shown = $derived(problems.filter(p => !q || (p.name + ' ' + p.crag + ' ' + p.grade).toLowerCase().includes(q.toLowerCase())))
   let grades = $derived([...new Set(problems.map(p => p.grade))])
+  let noMatch = $derived(!!q.trim() && shown.length === 0)
+
+  // Reporting a boulder that isn't on the list yet: admins get an email and decide.
+  let form = $state(null), sugBusy = $state(false), sugErr = $state(''), sugSent = $state('')
+  function openForm() {
+    sugErr = ''; sugSent = ''
+    form = { name: q.trim(), crag: '', country: '', grade: grades[0] || '8C', fa_name: '', fa_date: '', note: '' }
+  }
+  async function suggest(e) {
+    e.preventDefault()
+    sugBusy = true; sugErr = ''
+    try {
+      await api.post('/api/problem-suggestions', form)
+      sugSent = form.name; form = null; q = ''  // clear the search so the "no match" card doesn't come straight back
+    } catch (x) { sugErr = x.message } finally { sugBusy = false }
+  }
 </script>
 
 <div class="container">
@@ -48,6 +64,42 @@
   </div>
 
   <div class="field"><input placeholder="Search by name, crag or grade…" bind:value={q} /></div>
+
+  {#if sugSent}
+    <p class="ok small">Thanks — <strong>{sugSent}</strong> has been sent to the admins. They'll add it if it belongs on the list.</p>
+  {/if}
+
+  {#if noMatch && !form && problems.length}
+    <div class="card empty">
+      <p class="muted" style="margin:0">No problem matches “{q}”.</p>
+      <button class="primary" onclick={openForm}>Add boulder</button>
+    </div>
+  {/if}
+
+  {#if form}
+    <div class="card">
+      <h3 style="margin-top:0">Add a missing boulder</h3>
+      <p class="muted small">This doesn't add it to the list straight away — it's sent to the admins to check first.</p>
+      <form onsubmit={suggest}>
+        <div class="formGrid">
+          <div class="field"><label for="s-name">Name</label><input id="s-name" bind:value={form.name} required maxlength="120" /></div>
+          <div class="field"><label for="s-grade">Grade</label>
+            <select id="s-grade" bind:value={form.grade}>{#each grades as g}<option>{g}</option>{/each}</select>
+          </div>
+          <div class="field"><label for="s-crag">Crag</label><input id="s-crag" bind:value={form.crag} maxlength="120" /></div>
+          <div class="field"><label for="s-country">Country</label><input id="s-country" bind:value={form.country} maxlength="120" /></div>
+          <div class="field"><label for="s-fa">First ascent by</label><input id="s-fa" bind:value={form.fa_name} maxlength="120" /></div>
+          <div class="field"><label for="s-date">First ascent date</label><input id="s-date" bind:value={form.fa_date} placeholder="2024-03" maxlength="40" /></div>
+        </div>
+        <div class="field"><label for="s-note">Anything else</label><textarea id="s-note" rows="2" bind:value={form.note} maxlength="2000"></textarea></div>
+        {#if sugErr}<p class="error small">{sugErr}</p>{/if}
+        <div class="row">
+          <button class="primary" disabled={sugBusy}>Send to admins</button>
+          <button type="button" class="ghost" onclick={() => (form = null)}>Cancel</button>
+        </div>
+      </form>
+    </div>
+  {/if}
 
   {#each grades as g}
     {@const rows = shown.filter(p => p.grade === g).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))}
@@ -79,4 +131,6 @@
   .seg button:first-child { border-radius: 6px 0 0 6px; } .seg button:last-child { border-radius: 0 6px 6px 0; border-left: none; }
   .seg button.on { background: var(--accent); color: #111; border-color: var(--accent); }
   .tick.tried .seg button.on { background: var(--fg2); border-color: var(--fg2); }
+  .empty { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; }
+  .formGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 1rem; }
 </style>
