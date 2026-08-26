@@ -57,20 +57,20 @@
       </div>
       <div class="field"><input placeholder="Filter…" bind:value={q} /></div>
       <div class="tableWrap"><table>
-        <thead><tr><th class="num">#</th><th>Problem</th><th>Crag</th><th>Grade</th><th class="num">Rating</th><th class="num">±</th><th>Confidence</th><th class="num">Votes</th></tr></thead>
+        <thead><tr><th class="num">#</th><th>Problem</th><th>Crag</th><th class="num">Rating</th><th>Grade</th><th class="num">±</th><th>Confidence</th><th class="num">Votes</th></tr></thead>
         <tbody>
         {#each rows as r}
           <tr>
             <td class="num faint">{r.rank}</td>
             <td><strong>{r.problem.name}</strong></td>
             <td class="muted">{r.problem.crag}</td>
-            <td><span class="grade">{r.problem.grade}</span></td>
             <td class="num">
               {r.rating.toFixed(0)}
               {#if r.delta >= 1}<span class="mv up" title="Up {r.delta.toFixed(0)} from its {r.seed_grade} starting point of {r.seed_rating.toFixed(0)}">▲<span class="d">{r.delta.toFixed(0)}</span></span>
               {:else if r.delta <= -1}<span class="mv down" title="Down {Math.abs(r.delta).toFixed(0)} from its {r.seed_grade} starting point of {r.seed_rating.toFixed(0)}">▼<span class="d">{Math.abs(r.delta).toFixed(0)}</span></span>
               {:else}<span class="mv none"></span>{/if}
             </td>
+            <td><span class="grade">{r.problem.grade}</span></td>
             <td class="num faint">{r.uncertainty == null ? '' : r.uncertainty.toFixed(0)}</td>
             <td><span class="pill {r.confidence}">{r.confidence}</span></td>
             <td class="num faint" title="{r.n_climbers} climbers">{r.n_comparisons}</td>
