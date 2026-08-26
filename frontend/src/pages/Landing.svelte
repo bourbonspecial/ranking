@@ -38,7 +38,6 @@
       <h2>Who can see what</h2>
       <ul>
         <li>Membership requires at least two ascents at 8C or harder, and is by invitation.</li>
-        <li>Your individual answers are never shown to other members.</li>
         <li>The global list is currently members-only. Once there are enough votes for it to mean something, it will be made public.</li>
         <li>Your own personal ordering and answers are private by default. You can choose to make them public from your profile.</li>
       </ul>
@@ -80,7 +79,7 @@
 </div>
 
 <style>
-  .landing { min-height: 100vh; display: grid; place-items: start center; padding: 3rem 1.25rem 4rem; background:
+  .landing { min-height: calc(100vh - 6rem); display: grid; place-items: start center; padding: 3rem 1.25rem 4rem; background:
     radial-gradient(ellipse at 20% 0%, #1a1608 0%, transparent 55%), var(--bg); }
   .inner { max-width: 640px; width: 100%; }
   .eyebrow { font-size: .75rem; letter-spacing: .18em; text-transform: uppercase; color: var(--accent); margin-bottom: 1.25rem; }

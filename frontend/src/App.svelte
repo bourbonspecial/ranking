@@ -9,6 +9,7 @@
   import Profile from './pages/Profile.svelte'
   import Admin from './pages/Admin.svelte'
   import PublicProfile from './pages/PublicProfile.svelte'
+  import Footer from './lib/Footer.svelte'
 
   refreshMe()
 
@@ -39,4 +40,5 @@
 {#if page}
   {@const Page = page}
   <Page />
+  <Footer />
 {/if}
