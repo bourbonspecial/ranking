@@ -29,7 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = REPO_ROOT / "data"
 SEED_DB = DATA_DIR / "seed.sqlite"
 LOCAL_DB = DATA_DIR / "local.sqlite"
-PROBLEMS_CSV = DATA_DIR / "hardest_problems.csv"
+PROBLEMS_CSV = DATA_DIR / "hardest_problems_8c.csv"
 
 
 class Base(DeclarativeBase):

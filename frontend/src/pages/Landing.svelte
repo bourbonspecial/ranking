@@ -16,7 +16,7 @@
 
 <div class="landing">
   <div class="inner">
-    <div class="eyebrow">8C+ and above · by invitation</div>
+    <div class="eyebrow">8C and above · by invitation</div>
     <h1>Some of them are harder than the grade says.<br/>You already know which.</h1>
     <p class="lede">
       A single ordering of the world's hardest boulder problems, built one question at a time
@@ -27,17 +27,17 @@
     <section class="how">
       <h2>How it works</h2>
       <ol>
-        <li><strong>Tell us what you've climbed.</strong> Every problem 8C+ and harder is in the database. Tick yours — and, if you like, the ones you've tried but not done.</li>
+        <li><strong>Tell us what you've climbed.</strong> Every problem 8C and harder is in the database. Tick yours — and, if you like, the ones you've tried but not done.</li>
         <li><strong>Answer one question at a time.</strong> We show you two problems from your own list and ask which was harder <em>for you</em>: A, B, or very similar. Keyboard-fast. Change your mind any time.</li>
         <li><strong>The list assembles itself.</strong> Every answer is a match between two problems. A Bradley–Terry model (a cousin of chess Elo) turns thousands of these matches into one ordered list, with a confidence measure for each problem. Grades only seed it; opinions overwrite them.</li>
-        <li><strong>See where things really sit.</strong> A problem that most people rank above the 8C+s it shares a grade with is probably due an upgrade. The list makes that visible without anyone having to say it.</li>
+        <li><strong>See where things really sit.</strong> A problem that most people rank above the 8C+s while it still gets 8C is probably due an upgrade. The list makes that visible without anyone having to say it.</li>
       </ol>
     </section>
 
     <section class="how">
       <h2>Who can see what</h2>
       <ul>
-        <li>Membership requires at least two ascents at 8C+ or harder, and is by invitation.</li>
+        <li>Membership requires at least two ascents at 8C or harder, and is by invitation.</li>
         <li>Your individual answers are never shown to other members.</li>
         <li>The global list is currently members-only. Once there are enough votes for it to mean something, it will be made public.</li>
         <li>Your own personal ordering and answers are private by default. You can choose to make them public from your profile.</li>

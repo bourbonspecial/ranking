@@ -3,7 +3,7 @@
 ## Goal
 
 A single, continuously updated, globally ordered list of every boulder problem
-graded **8C+ or harder** (floor raised from 8C to match the source list), worldwide, derived from pairwise "which was harder for
+graded **8C or harder**, worldwide, derived from pairwise "which was harder for
 you?" judgements made by climbers who have climbed both problems.
 
 Grades are not the output. The ordering is. Grade bands may be layered on top
@@ -38,7 +38,7 @@ later as an afterthought.
 ### Climber (user)
 - `id`, `name` (real name, visible to members), `email`
 - `status`: requested → invited → active
-- Eligibility: **≥2 climbed ascents at 8C+ or harder** (i.e. at least one possible pair)
+- Eligibility: **≥2 climbed ascents at 8C or harder** (i.e. at least one possible pair)
 - `ascents`: Problem ids on the climber's list, each **done** (climbed) or
   **tried** (attempted, not climbed)
 
@@ -131,7 +131,7 @@ Public:
 2. **Magic-link landing** — consumes the token, sets session.
 
 Members:
-3. **Tick list** — searchable master list of 8C+ problems; climber toggles
+3. **Tick list** — searchable master list of 8C-and-harder problems; climber toggles
    their ascents. Link to "problem missing?" which creates an admin request.
 4. **Compare** — one pair at a time, three buttons, keyboard shortcuts,
    progress indicator ("14 of 210 pairs answered"). Option to skip.
@@ -197,6 +197,6 @@ batch of invites.
   rating points (seed outweighed after roughly 12 comparisons). Best or
   joint-best on the simulator across dense/sparse data and accurate/noisy
   grades; see README.
-- ~~Access method for climbing-history.org data~~ — CSV export at `data/hardest_problems.csv` for now.
+- ~~Access method for climbing-history.org data~~ — CSV export at `data/hardest_problems_8c.csv` for now.
 - Email provider choice.
 - Svelte vs React.

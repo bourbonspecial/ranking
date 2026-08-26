@@ -5,6 +5,7 @@
 
     ranking db build-seed          rebuild data/seed.sqlite from data/hardest_problems.csv
     ranking db init [--force]      copy seed -> data/local.sqlite (gitignored)
+    ranking db import [CSV] [--db PATH]   upsert problems from CSV into an existing db (default: local)
     ranking recompute [--db PATH]  fit every algorithm and store a snapshot
     ranking list [--algo A] [--db PATH]   print the latest stored ranking
     ranking serve [--host H] [--port P] [--reload]   run the API (env: RANKING_* see api/settings.py)
@@ -97,6 +98,9 @@ def main(argv=None) -> None:
     dsub.add_parser("build-seed")
     di = dsub.add_parser("init")
     di.add_argument("--force", action="store_true", help="overwrite an existing local db")
+    dm = dsub.add_parser("import")
+    dm.add_argument("csv", nargs="?", default=None)
+    dm.add_argument("--db", default=None)
 
     rc = sub.add_parser("recompute")
     rc.add_argument("--db", default=None)
@@ -137,11 +141,16 @@ def main(argv=None) -> None:
             s.commit()
             print(f"admin: {c.name} <{c.email}> (id {c.id})")
     elif a.cmd == "db":
-        from .db import LOCAL_DB, SEED_DB, init_local_db
-        from .importer import build_seed_db
+        from pathlib import Path
+        from .db import LOCAL_DB, PROBLEMS_CSV, SEED_DB, init_local_db
+        from .importer import build_seed_db, import_problems
         if a.dbcmd == "build-seed":
             n = build_seed_db()
             print(f"wrote {n} problems to {SEED_DB}")
+        elif a.dbcmd == "import":
+            db_path = Path(a.db) if a.db else init_local_db()
+            added, updated = import_problems(Path(a.csv) if a.csv else PROBLEMS_CSV, db_path)
+            print(f"{db_path}: {added} added, {updated} updated")
         else:
             existed = LOCAL_DB.exists()
             path = init_local_db(force=a.force)

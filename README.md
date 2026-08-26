@@ -14,7 +14,7 @@ with hot reload on :5173.
 
 ## Data
 
-- `data/hardest_problems.csv` — source list of problems 8C+ and harder.
+- `data/hardest_problems_8c.csv` — source list of problems 8C and harder (433 problems).
 - `data/seed.sqlite` — committed. Built from the CSV with `ranking db build-seed`; problems only.
 - `data/local.sqlite` — gitignored. Copied from the seed on first `ranking db init`; all local
   climbers, comparisons and rating snapshots live here.
@@ -23,6 +23,7 @@ with hot reload on :5173.
 .venv/bin/ranking db init        # copy seed -> local (no-op if it exists; --force to reset)
 .venv/bin/ranking recompute      # fit every algorithm, store a snapshot run in local.sqlite
 .venv/bin/ranking list           # latest stored ranking (--algo elo|win_rate)
+.venv/bin/ranking db import      # upsert a refreshed CSV into local.sqlite (keeps ids and comparisons)
 ```
 
 Schema (`ranking/db.py`): problems, climbers, ascents, comparisons (live, one per

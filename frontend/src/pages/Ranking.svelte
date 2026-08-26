@@ -73,7 +73,7 @@
         {/each}
         </tbody>
       </table></div>
-      <p class="faint small" style="margin-top: 1rem">Rating is on an Elo-like scale seeded from grade (8C+ 1750 · 9A 2000 · 9A+ 2250) and overwritten by comparisons as they accumulate. ± is one standard deviation where the model provides it. The global list is members-only for now.</p>
+      <p class="faint small" style="margin-top: 1rem">Rating is on an Elo-like scale seeded from grade (8C 1500 · 8C+ 1750 · 9A 2000 · 9A+ 2250) and overwritten by comparisons as they accumulate. ± is one standard deviation where the model provides it. The global list is members-only for now.</p>
     {/if}
   {:else}
     {#if progress}

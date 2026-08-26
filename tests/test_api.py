@@ -79,7 +79,7 @@ def test_invite_request_then_admin_invite_then_member_flow(app, anon, admin):
 
     # 4. ticks, pairs, comparisons, gate
     problems = nalle.get("/api/problems").json()
-    assert len(problems) == 85
+    assert len(problems) == 433
     ids = [p["id"] for p in problems[:5]]
     tried = problems[20]["id"]
     prog = nalle.put("/api/me/ascents", json={"done": ids, "tried": [tried]}).json()
@@ -112,7 +112,7 @@ def test_invite_request_then_admin_invite_then_member_flow(app, anon, admin):
 
     # 5. ranking (recompute ran synchronously with debounce=0)
     rk = nalle.get("/api/ranking").json()
-    assert rk["algorithm"] == "bradley_terry" and len(rk["rows"]) == 85 and rk["n_comparisons"] == 10
+    assert rk["algorithm"] == "bradley_terry" and len(rk["rows"]) == 433 and rk["n_comparisons"] == 10
     assert rk["include_attempts"] is False and rk["attempt_weight"] is None
     with_att = nalle.get("/api/ranking", params={"include_attempts": "true"}).json()
     assert with_att["n_comparisons"] == 11 and with_att["attempt_weight"] == 0.4
@@ -120,7 +120,7 @@ def test_invite_request_then_admin_invite_then_member_flow(app, anon, admin):
     assert nalle.get("/api/ranking", params={"algo": "elo"}).json()["algorithm"] == "elo"
     assert nalle.get("/api/ranking", params={"algo": "bogus"}).status_code == 400
 
-    assert rk["stats"] == {"n_problems": 85, "n_with_data": 5, "n_members": 2, "n_voters": 1,
+    assert rk["stats"] == {"n_problems": 433, "n_with_data": 5, "n_members": 2, "n_voters": 1,
                            "n_comparisons_total": 11}
 
     mine = nalle.get("/api/me/ranking").json()

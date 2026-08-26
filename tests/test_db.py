@@ -5,7 +5,7 @@ import pytest
 from ranking import Verdict
 from ranking import repo
 from ranking.db import PROBLEMS_CSV, create_schema, init_local_db, make_session_factory
-from ranking.importer import build_seed_db, parse_first_ascent, read_problems_csv
+from ranking.importer import build_seed_db, import_problems, parse_first_ascent, read_problems_csv
 
 
 @pytest.fixture
@@ -23,8 +23,8 @@ def test_parse_first_ascent():
 
 def test_csv_import_has_all_rows():
     rows = read_problems_csv()
-    assert len(rows) == 85
-    assert {r["seed_grade"] for r in rows} == {"8C+", "9A", "9A+"}
+    assert len(rows) == 433
+    assert {r["seed_grade"] for r in rows} == {"8C", "8C+", "9A", "9A+"}
 
 
 def test_init_local_copies_seed(tmp_path):
@@ -33,7 +33,7 @@ def test_init_local_copies_seed(tmp_path):
     init_local_db(seed, local)
     assert local.exists()
     with make_session_factory(local)() as s:
-        assert len(repo.all_problems(s)) == 85
+        assert len(repo.all_problems(s)) == 433
 
 
 def test_full_flow(db):
@@ -79,7 +79,7 @@ def test_full_flow(db):
         runs = repo.recompute_all(s)
         assert len(runs) == 6
         ranking = repo.latest_ranking(s, "bradley_terry")
-        assert len(ranking) == 85
+        assert len(ranking) == 433
         assert repo.latest_run(s, "bradley_terry", True).n_comparisons == 2
         assert repo.latest_run(s, "bradley_terry", False).n_comparisons == 1
         assert ranking[0][0].rank == 1
@@ -92,3 +92,15 @@ def test_full_flow(db):
         # removing a problem removes comparisons involving it
         repo.set_ascents(s, me.id, ids[1:], [])
         assert repo.climber_comparisons(s, me.id) == []
+
+
+def test_import_upserts_without_disturbing_existing_rows(tmp_path):
+    db = tmp_path / "t.sqlite"
+    build_seed_db(PROBLEMS_CSV, db)
+    with make_session_factory(db)() as s:
+        first = repo.all_problems(s)[0]
+    # importing the same file again adds nothing, refreshes everything, keeps ids
+    added, updated = import_problems(PROBLEMS_CSV, db)
+    assert (added, updated) == (0, 433)
+    with make_session_factory(db)() as s:
+        assert repo.all_problems(s)[0] == first
