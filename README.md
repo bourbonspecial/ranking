@@ -44,7 +44,13 @@ Configuration lives in `.env` (gitignored; `start.sh` loads it). Copy `.env.exam
 the Resend API key to send real mail via SMTP. `RANKING_BASE_URL` is embedded in every magic
 link. `remknowles@gmail.com` and `alexander.gradenegger@gmail.com` are always admins
 (`DEFAULT_ADMIN_EMAILS`); add more via `RANKING_ADMIN_EMAILS` or the admin panel's "Make admin".
-An invited member receives a welcome email the first time they sign in.
+An invited member receives a welcome email the first time they sign in. Admins can flag a
+member as a **test user** (admin panel → Test): they can use everything, but their comparisons
+are excluded from the global ranking and its stats.
+
+Schema changes: `create_schema()` runs on every start (via `ranking db init`) and both creates
+missing tables and adds missing columns listed in `db._ADDED_COLUMNS`, so a deploy migrates the
+server database automatically. Add new columns there.
 
 | route | who | what |
 |---|---|---|

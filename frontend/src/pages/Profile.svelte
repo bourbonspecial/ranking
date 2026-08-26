@@ -13,8 +13,9 @@
 </script>
 
 <div class="container">
-  <h1>{session.me.name}</h1>
+  <h1>{session.me.name} {#if session.me.is_test}<span class="pill test">test user</span>{/if}</h1>
   <p class="muted">{session.me.email} {#if session.me.is_admin}· admin{/if}</p>
+  {#if session.me.is_test}<div class="notice small">You're set up as a <strong>test user</strong>: everything works as normal, but your comparisons are not counted in the global list. Your personal ordering still uses them.</div>{/if}
   {#if progress}
     <div class="row" style="margin: 1rem 0 2rem; gap:.75rem">
       <div class="card stat"><div class="big">{progress.n_done}</div><div class="muted small">climbed</div></div>
@@ -40,4 +41,5 @@
     {#if err}<p class="error small" style="margin-top:.5rem">{err}</p>{/if}
   </div>
 </div>
-<style>.stat { min-width: 120px; } @media (max-width: 640px) { .stat { min-width: 0; flex: 1 1 28%; } } .big { font-size: 1.8rem; font-family: var(--mono); }</style>
+<style>.pill.test { border-color: var(--accent2); color: var(--accent2); vertical-align: middle; font-size: .7rem; }
+.stat { min-width: 120px; } @media (max-width: 640px) { .stat { min-width: 0; flex: 1 1 28%; } } .big { font-size: 1.8rem; font-family: var(--mono); }</style>

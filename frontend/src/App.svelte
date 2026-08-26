@@ -31,7 +31,7 @@
 
 {#if session.me}
   <nav class="top" class:open={menuOpen}>
-    <a href="/" class="brand"><Logo size={22} /> The List</a>
+    <a href="/" class="brand"><Logo size={22} /> The List{#if session.me.is_test} <span class="pill test">test</span>{/if}</a>
     <button class="ghost burger" aria-label={menuOpen ? 'Close menu' : 'Open menu'} aria-expanded={menuOpen} onclick={() => (menuOpen = !menuOpen)}>
       <span></span><span></span><span></span>
     </button>

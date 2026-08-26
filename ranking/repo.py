@@ -142,12 +142,24 @@ def comparison_kind(row: ComparisonRow, statuses: dict[tuple[int, int], str]) ->
     return "done" if both_done else "attempt"
 
 
+def test_climber_ids(s: Session) -> set[int]:
+    return set(s.scalars(select(ClimberRow.id).where(ClimberRow.is_test == True)))  # noqa: E712
+
+
 def all_comparisons(s: Session, include_attempts: bool = True,
-                    attempt_weight: float = DEFAULT_ATTEMPT_WEIGHT) -> list[Comparison]:
-    """Live comparisons as engine objects, weighted by ascent status."""
+                    attempt_weight: float = DEFAULT_ATTEMPT_WEIGHT,
+                    exclude_test: bool = True) -> list[Comparison]:
+    """Live comparisons as engine objects, weighted by ascent status.
+
+    Test climbers' comparisons are excluded by default so they never reach
+    the global ranking; pass exclude_test=False for a climber's own view.
+    """
     statuses = _all_statuses(s)
+    skip = test_climber_ids(s) if exclude_test else set()
     out = []
     for r in s.scalars(select(ComparisonRow).order_by(ComparisonRow.updated_at, ComparisonRow.id)):
+        if r.climber_id in skip:
+            continue
         kind = comparison_kind(r, statuses)
         if kind == "attempt" and not include_attempts:
             continue
@@ -267,4 +279,5 @@ def latest_ranking(s: Session, algorithm: str = "bradley_terry",
 
 def personal(s: Session, climber_id: int, attempt_weight: float = DEFAULT_ATTEMPT_WEIGHT) -> RankingResult:
     return personal_ranking(str(climber_id), ticked_problems(s, climber_id),
-                            all_comparisons(s, include_attempts=True, attempt_weight=attempt_weight))
+                            all_comparisons(s, include_attempts=True, attempt_weight=attempt_weight,
+                                            exclude_test=False))

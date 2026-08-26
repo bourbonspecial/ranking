@@ -41,7 +41,7 @@ tr:hover td { background: var(--bg2); }
 .grade { font-family: var(--mono); font-size: .8rem; padding: .1rem .4rem; border-radius: 4px; background: var(--bg3); color: var(--fg2); }
 .pill { display: inline-block; font-size: .72rem; padding: .1rem .5rem; border-radius: 999px; border: 1px solid var(--line); color: var(--fg2); text-transform: uppercase; letter-spacing: .05em; }
 .pill.high { border-color: var(--ok); color: var(--ok); } .pill.medium { border-color: var(--accent); color: var(--accent); }
-.pill.low { border-color: var(--fg3); } .pill.none { color: var(--fg3); border-style: dashed; }
+.pill.low { border-color: var(--fg3); } .pill.test { border-color: var(--accent2); color: var(--accent2); } .pill.none { color: var(--fg3); border-style: dashed; }
 .error { color: var(--danger); } .ok { color: var(--ok); }
 .row { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
 .tableWrap { overflow-x: auto; }

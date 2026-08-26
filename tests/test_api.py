@@ -156,6 +156,30 @@ def test_invite_request_then_admin_invite_then_member_flow(app, anon, admin):
     assert nalle.put("/api/me/ascents", json={"done": [99999]}).status_code == 400
 
 
+def test_test_users_are_excluded_from_global_ranking(app, admin):
+    r = admin.post("/api/admin/invite", json={"name": "Tester", "email": "tester@example.com"})
+    cid = r.json()["id"]
+    tester = TestClient(app, base_url="http://localhost:8000", follow_redirects=False)
+    tester.get(re.search(r"http://\S+", app.state.mailer.sent[-1]["body"]).group(0))
+    ids = [p["id"] for p in tester.get("/api/problems").json()[:3]]
+    tester.put("/api/me/ascents", json={"done": ids})
+    for a, b in [(ids[0], ids[1]), (ids[0], ids[2]), (ids[1], ids[2])]:
+        tester.post("/api/me/comparisons", json={"problem_a": a, "problem_b": b, "verdict": "A_HARDER"})
+    assert admin.get("/api/ranking").json()["n_comparisons"] == 3
+
+    r = admin.post(f"/api/admin/climbers/{cid}/test")
+    assert r.json()["is_test"] is True
+    rk = admin.get("/api/ranking").json()
+    assert rk["n_comparisons"] == 0 and rk["stats"]["n_voters"] == 0 and rk["stats"]["n_comparisons_total"] == 0
+    # they still get their own ordering, and see the flag on /me
+    assert len(tester.get("/api/me/ranking").json()) == 3
+    assert tester.get("/api/me/ranking").json()[0]["n_comparisons"] == 2
+    assert tester.get("/api/me").json()["is_test"] is True
+
+    assert admin.post(f"/api/admin/climbers/{cid}/test", params={"value": "false"}).json()["is_test"] is False
+    assert admin.get("/api/ranking").json()["n_comparisons"] == 3
+
+
 def test_admin_direct_invite_and_reject(app, admin):
     r = admin.post("/api/admin/invite", json={"name": "Aidan", "email": "aidan@example.com"})
     assert r.status_code == 200 and r.json()["status"] == "invited"

@@ -90,6 +90,7 @@
       </div>
     {/if}
     <p class="muted small" style="margin: 1rem 0 .75rem">Your problems ordered by your answers alone, next to where each sits on the global list.
+      {#if session.me?.is_test}<span class="pill test">test user</span> Your answers don't count towards the global list.{/if}
       {#if session.me?.public_profile}This is <a href="/climber/{session.me.id}">public</a>.{:else}Private to you — you can make it public from your <a href="/profile">profile</a>.{/if}</p>
     {#if !mine || !mine.length}
       <p class="faint">Tick some ascents and answer a few pairs first.</p>
@@ -100,6 +101,7 @@
 </div>
 
 <style>
+  .pill.test { border-color: var(--accent2); color: var(--accent2); }
   .mv { display: inline-block; min-width: 3.2em; text-align: left; margin-left: .35rem; font-size: .75rem; }
   .mv .d { margin-left: .15rem; }
   .up, .mv.up { color: var(--ok); } .down, .mv.down { color: var(--danger); }

@@ -7,6 +7,7 @@
   const invite = (c) => act(() => api.post(`/api/admin/climbers/${c.id}/invite`), `Invitation sent to ${c.email}`)
   const reject = (c) => act(() => api.post(`/api/admin/climbers/${c.id}/reject`), `${c.email} deactivated`)
   const admin = (c, v) => act(() => api.post(`/api/admin/climbers/${c.id}/admin?value=${v}`), 'Updated')
+  const test = (c, v) => act(() => api.post(`/api/admin/climbers/${c.id}/test?value=${v}`), v ? `${c.name} is now a test user; their comparisons are excluded from the ranking` : `${c.name}'s comparisons now count`)
   const recompute = () => act(() => api.post('/api/admin/recompute'), 'Ratings recomputed')
   async function inviteNew(e) { e.preventDefault(); await act(() => api.post('/api/admin/invite', { name, email }), `Invitation sent to ${email}`); name = ''; email = '' }
   const groups = [['requested', 'Invite requests'], ['invited', 'Invited, not yet signed in'], ['active', 'Members'], ['deactivated', 'Deactivated / rejected']]
@@ -30,14 +31,15 @@
     <h2 style="margin-top: 1.5rem">{title} <span class="faint">({rows.length})</span></h2>
     {#if !rows.length}<p class="faint small">None.</p>{:else}
     <div class="tableWrap"><table>
-      <thead><tr><th>Name</th><th>Email</th>{#if status === 'requested'}<th>Claims</th>{/if}<th class="num">Ascents</th><th class="num">Answers</th><th></th></tr></thead>
+      <thead><tr><th>Name</th><th>Email</th>{#if status === 'requested'}<th>Claims</th>{/if}<th class="num">Ascents</th><th class="num">Answers</th>{#if status === 'active'}<th title="Test users can use everything but their comparisons are excluded from the global ranking">Test</th>{/if}<th></th></tr></thead>
       <tbody>
       {#each rows as c}
         <tr>
-          <td>{c.name}{#if c.is_admin} <span class="pill">admin</span>{/if}</td>
+          <td>{c.name}{#if c.is_admin} <span class="pill">admin</span>{/if}{#if c.is_test} <span class="pill test">test</span>{/if}</td>
           <td class="mono small">{c.email}</td>
           {#if status === 'requested'}<td class="small muted">{c.request_note ?? ''}</td>{/if}
           <td class="num">{c.n_ascents}</td><td class="num">{c.n_comparisons}</td>
+          {#if status === 'active'}<td><input type="checkbox" checked={c.is_test} onchange={(e) => test(c, e.target.checked)} style="width:auto; accent-color: var(--accent2)" title="Exclude this user's comparisons from the global ranking" /></td>{/if}
           <td style="white-space:nowrap; text-align:right">
             {#if status === 'requested'}<button class="primary" onclick={() => invite(c)}>Invite</button> <button class="danger" onclick={() => reject(c)}>Reject</button>
             {:else if status === 'invited'}<button onclick={() => invite(c)}>Resend</button> <button class="danger" onclick={() => reject(c)}>Revoke</button>
@@ -51,3 +53,5 @@
     {/if}
   {/each}
 </div>
+
+<style>.pill.test { border-color: var(--accent2); color: var(--accent2); }</style>

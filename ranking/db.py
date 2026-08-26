@@ -63,6 +63,7 @@ class ClimberRow(Base):
     status: Mapped[str] = mapped_column(String, default="requested")  # requested | invited | active | deactivated
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     public_profile: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    is_test: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")  # comparisons excluded from the global ranking
     request_note: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
@@ -166,6 +167,7 @@ _ADDED_COLUMNS = [
     ("ascents", "status", "VARCHAR NOT NULL DEFAULT 'done'"),
     ("rating_runs", "include_attempts", "BOOLEAN NOT NULL DEFAULT 0"),
     ("climbers", "public_profile", "BOOLEAN NOT NULL DEFAULT 0"),
+    ("climbers", "is_test", "BOOLEAN NOT NULL DEFAULT 0"),
 ]
 
 

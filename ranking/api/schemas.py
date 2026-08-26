@@ -26,6 +26,7 @@ class ClimberOut(BaseModel):
     n_comparisons: int = 0
     request_note: str = ""
     public_profile: bool = False
+    is_test: bool = False
 
 
 class MeUpdateIn(BaseModel):

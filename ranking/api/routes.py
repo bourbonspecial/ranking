@@ -33,7 +33,7 @@ def climber_out(s: Session, c: ClimberRow) -> ClimberOut:
     n_cmp = s.scalar(select(func.count()).select_from(ComparisonRow).where(ComparisonRow.climber_id == c.id)) or 0
     return ClimberOut(id=c.id, name=c.name, email=c.email, status=c.status, is_admin=c.is_admin,
                       n_ascents=n_asc, n_comparisons=n_cmp, request_note=c.request_note or "",
-                      public_profile=c.public_profile)
+                      public_profile=c.public_profile, is_test=c.is_test)
 
 
 def _personal_rows(s: Session, climber: ClimberRow, attempt_weight: float) -> list[PersonalRowOut]:
@@ -206,9 +206,13 @@ def ranking(algo: str = "bradley_terry", include_attempts: bool = False,
                       delta=round(snap.rating - grade_to_rating(prob.seed_grade), 1))
         for snap, prob in repo.latest_ranking(s, algo, include_attempts)
     ]
-    n_members = s.scalar(select(func.count()).select_from(ClimberRow).where(ClimberRow.status == "active")) or 0
-    n_voters = s.scalar(select(func.count(func.distinct(ComparisonRow.climber_id)))) or 0
-    n_total = s.scalar(select(func.count()).select_from(ComparisonRow)) or 0
+    real = ClimberRow.is_test == False  # noqa: E712 - test users don't count towards the global picture
+    n_members = s.scalar(select(func.count()).select_from(ClimberRow)
+                         .where(ClimberRow.status == "active", real)) or 0
+    n_voters = s.scalar(select(func.count(func.distinct(ComparisonRow.climber_id)))
+                        .join(ClimberRow, ClimberRow.id == ComparisonRow.climber_id).where(real)) or 0
+    n_total = s.scalar(select(func.count()).select_from(ComparisonRow)
+                       .join(ClimberRow, ClimberRow.id == ComparisonRow.climber_id).where(real)) or 0
     stats = RankingStatsOut(n_problems=len(rows), n_with_data=sum(1 for r in rows if r.n_comparisons > 0),
                             n_members=n_members, n_voters=n_voters, n_comparisons_total=n_total)
     return RankingOut(algorithm=algo, include_attempts=include_attempts,
@@ -274,6 +278,20 @@ def set_admin(climber_id: int, value: bool = True, s: Session = Depends(get_db))
     if c is None:
         raise HTTPException(404)
     c.is_admin = value
+    return climber_out(s, c)
+
+
+@admin.post("/climbers/{climber_id}/test", response_model=ClimberOut)
+def set_test(climber_id: int, value: bool = True, s: Session = Depends(get_db), recomputer=Depends(get_recomputer)):
+    """Mark a climber as a test user: they can use everything, but their comparisons
+    never count towards the global ranking. Toggling triggers a recompute."""
+    c = s.get(ClimberRow, climber_id)
+    if c is None:
+        raise HTTPException(404)
+    if c.is_test != value:
+        c.is_test = value
+        s.commit()
+        recomputer.schedule()
     return climber_out(s, c)
 
 
