@@ -18,4 +18,5 @@ export const api = {
   get: (p) => req('GET', p),
   post: (p, b) => req('POST', p, b ?? {}),
   put: (p, b) => req('PUT', p, b),
+  patch: (p, b) => req('PATCH', p, b),
 }

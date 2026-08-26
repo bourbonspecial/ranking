@@ -25,6 +25,11 @@ class ClimberOut(BaseModel):
     n_ascents: int = 0
     n_comparisons: int = 0
     request_note: str = ""
+    public_profile: bool = False
+
+
+class MeUpdateIn(BaseModel):
+    public_profile: bool | None = None
 
 
 class InviteRequestIn(BaseModel):
@@ -96,13 +101,31 @@ class RankingRowOut(BaseModel):
     seed_grade: str
 
 
+class RankingStatsOut(BaseModel):
+    n_problems: int
+    n_with_data: int          # problems with at least one comparison in this variant
+    n_members: int            # active members
+    n_voters: int             # members with at least one comparison
+    n_comparisons_total: int  # all live comparisons regardless of variant
+
+
 class RankingOut(BaseModel):
     algorithm: str
     include_attempts: bool
     attempt_weight: float | None
     computed_at: str | None
     n_comparisons: int
+    stats: RankingStatsOut
     rows: list[RankingRowOut]
+
+
+class PublicProfileOut(BaseModel):
+    name: str
+    n_done: int
+    n_tried: int
+    n_comparisons: int
+    ranking: list["PersonalRowOut"]
+    comparisons: list["ComparisonOut"]
 
 
 class PersonalRowOut(BaseModel):

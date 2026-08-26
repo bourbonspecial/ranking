@@ -62,6 +62,7 @@ class ClimberRow(Base):
     email: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     status: Mapped[str] = mapped_column(String, default="requested")  # requested | invited | active | deactivated
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    public_profile: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     request_note: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
@@ -164,6 +165,7 @@ def make_session_factory(path: Path | str) -> sessionmaker[Session]:
 _ADDED_COLUMNS = [
     ("ascents", "status", "VARCHAR NOT NULL DEFAULT 'done'"),
     ("rating_runs", "include_attempts", "BOOLEAN NOT NULL DEFAULT 0"),
+    ("climbers", "public_profile", "BOOLEAN NOT NULL DEFAULT 0"),
 ]
 
 

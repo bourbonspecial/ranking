@@ -50,7 +50,7 @@
   <div class="field"><input placeholder="Search by name, crag or grade…" bind:value={q} /></div>
 
   {#each grades as g}
-    {@const rows = shown.filter(p => p.grade === g)}
+    {@const rows = shown.filter(p => p.grade === g).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))}
     {#if rows.length}
       <h3 style="margin-top: 1.25rem">{g}</h3>
       <div class="grid">

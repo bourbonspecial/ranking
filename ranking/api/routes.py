@@ -13,7 +13,8 @@ from . import auth
 from .deps import get_db, get_mailer, get_recomputer, get_settings
 from .schemas import (
     AscentsIn, AscentsOut, ClimberOut, ComparisonIn, ComparisonOut, EmailIn, InviteIn, InviteRequestIn,
-    PairOut, PersonalRowOut, ProblemOut, ProgressOut, RankingOut, RankingRowOut,
+    MeUpdateIn, PairOut, PersonalRowOut, ProblemOut, ProgressOut, PublicProfileOut, RankingOut,
+    RankingRowOut, RankingStatsOut,
 )
 
 public = APIRouter(prefix="/api")
@@ -30,7 +31,30 @@ def climber_out(s: Session, c: ClimberRow) -> ClimberOut:
     n_asc = s.scalar(select(func.count()).select_from(AscentRow).where(AscentRow.climber_id == c.id)) or 0
     n_cmp = s.scalar(select(func.count()).select_from(ComparisonRow).where(ComparisonRow.climber_id == c.id)) or 0
     return ClimberOut(id=c.id, name=c.name, email=c.email, status=c.status, is_admin=c.is_admin,
-                      n_ascents=n_asc, n_comparisons=n_cmp, request_note=c.request_note or "")
+                      n_ascents=n_asc, n_comparisons=n_cmp, request_note=c.request_note or "",
+                      public_profile=c.public_profile)
+
+
+def _personal_rows(s: Session, climber: ClimberRow, attempt_weight: float) -> list[PersonalRowOut]:
+    mine = repo.personal(s, climber.id, attempt_weight)
+    st = repo.ascent_statuses(s, climber.id)
+    global_rank = {prob.id: snap.rank for snap, prob in repo.latest_ranking(s, "bradley_terry")}
+    return [
+        PersonalRowOut(rank=r.rank, problem=problem_out(s.get(ProblemRow, int(r.problem_id))),
+                       status=st.get(int(r.problem_id), ASCENT_DONE),
+                       rating=round(r.rating, 1), global_rank=global_rank.get(int(r.problem_id)),
+                       n_comparisons=r.n_comparisons)
+        for r in mine.ratings
+    ]
+
+
+def _comparison_rows(s: Session, climber_id: int) -> list[ComparisonOut]:
+    return [
+        ComparisonOut(problem_a=problem_out(s.get(ProblemRow, r.problem_a)),
+                      problem_b=problem_out(s.get(ProblemRow, r.problem_b)),
+                      verdict=Verdict(r.verdict), updated_at=r.updated_at.isoformat(), kind=kind)
+        for r, kind in repo.climber_comparisons(s, climber_id)
+    ]
 
 
 # ---- public -----------------------------------------------------------------
@@ -78,6 +102,19 @@ def logout(request: Request, response: Response, s: Session = Depends(get_db)):
 @public.get("/me")
 def me(s: Session = Depends(get_db), climber=Depends(auth.optional_climber)):
     return None if climber is None else climber_out(s, climber)
+
+
+@public.get("/climbers/{climber_id}/public", response_model=PublicProfileOut)
+def public_profile(climber_id: int, s: Session = Depends(get_db), settings=Depends(get_settings)):
+    """A member's personal ordering and answers, if they have chosen to make them public."""
+    c = s.get(ClimberRow, climber_id)
+    if c is None or c.status != "active" or not c.public_profile:
+        raise HTTPException(404, "This profile is private or does not exist.")
+    p = repo.progress(s, c.id)
+    return PublicProfileOut(name=c.name, n_done=p["n_done"], n_tried=p["n_tried"],
+                            n_comparisons=p["n_done_answered"] + p["n_attempt_answered"],
+                            ranking=_personal_rows(s, c, settings.attempt_weight),
+                            comparisons=_comparison_rows(s, c.id))
 
 
 # ---- member -----------------------------------------------------------------
@@ -136,12 +173,15 @@ def post_comparison(body: ComparisonIn, s: Session = Depends(get_db), climber=De
 
 @member.get("/me/comparisons", response_model=list[ComparisonOut])
 def my_comparisons(s: Session = Depends(get_db), climber=Depends(auth.current_climber)):
-    return [
-        ComparisonOut(problem_a=problem_out(s.get(ProblemRow, r.problem_a)),
-                      problem_b=problem_out(s.get(ProblemRow, r.problem_b)),
-                      verdict=Verdict(r.verdict), updated_at=r.updated_at.isoformat(), kind=kind)
-        for r, kind in repo.climber_comparisons(s, climber.id)
-    ]
+    return _comparison_rows(s, climber.id)
+
+
+@member.patch("/me", response_model=ClimberOut)
+def update_me(body: MeUpdateIn, s: Session = Depends(get_db), climber=Depends(auth.current_climber)):
+    if body.public_profile is not None:
+        climber.public_profile = body.public_profile
+    s.flush()
+    return climber_out(s, climber)
 
 
 @member.get("/ranking", response_model=RankingOut)
@@ -160,24 +200,20 @@ def ranking(algo: str = "bradley_terry", include_attempts: bool = False,
                       confidence=confidence_tier(snap.n_comparisons, snap.n_climbers), seed_grade=prob.seed_grade)
         for snap, prob in repo.latest_ranking(s, algo, include_attempts)
     ]
+    n_members = s.scalar(select(func.count()).select_from(ClimberRow).where(ClimberRow.status == "active")) or 0
+    n_voters = s.scalar(select(func.count(func.distinct(ComparisonRow.climber_id)))) or 0
+    n_total = s.scalar(select(func.count()).select_from(ComparisonRow)) or 0
+    stats = RankingStatsOut(n_problems=len(rows), n_with_data=sum(1 for r in rows if r.n_comparisons > 0),
+                            n_members=n_members, n_voters=n_voters, n_comparisons_total=n_total)
     return RankingOut(algorithm=algo, include_attempts=include_attempts,
                       attempt_weight=settings.attempt_weight if include_attempts else None,
                       computed_at=run.computed_at.isoformat() if run else None,
-                      n_comparisons=run.n_comparisons if run else 0, rows=rows)
+                      n_comparisons=run.n_comparisons if run else 0, stats=stats, rows=rows)
 
 
 @member.get("/me/ranking", response_model=list[PersonalRowOut])
 def my_ranking(s: Session = Depends(get_db), climber=Depends(auth.current_climber), settings=Depends(get_settings)):
-    mine = repo.personal(s, climber.id, settings.attempt_weight)
-    st = repo.ascent_statuses(s, climber.id)
-    global_rank = {prob.id: snap.rank for snap, prob in repo.latest_ranking(s, "bradley_terry")}
-    return [
-        PersonalRowOut(rank=r.rank, problem=problem_out(s.get(ProblemRow, int(r.problem_id))),
-                       status=st.get(int(r.problem_id), ASCENT_DONE),
-                       rating=round(r.rating, 1), global_rank=global_rank.get(int(r.problem_id)),
-                       n_comparisons=r.n_comparisons)
-        for r in mine.ratings
-    ]
+    return _personal_rows(s, climber, settings.attempt_weight)
 
 
 # ---- admin ------------------------------------------------------------------

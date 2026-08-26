@@ -120,9 +120,21 @@ def test_invite_request_then_admin_invite_then_member_flow(app, anon, admin):
     assert nalle.get("/api/ranking", params={"algo": "elo"}).json()["algorithm"] == "elo"
     assert nalle.get("/api/ranking", params={"algo": "bogus"}).status_code == 400
 
+    assert rk["stats"] == {"n_problems": 85, "n_with_data": 5, "n_members": 2, "n_voters": 1,
+                           "n_comparisons_total": 11}
+
     mine = nalle.get("/api/me/ranking").json()
     assert len(mine) == 6 and all(row["global_rank"] is not None for row in mine)
     assert sum(row["status"] == "tried" for row in mine) == 1
+
+    # 6. public profile is opt-in
+    cid = nalle.get("/api/me").json()["id"]
+    assert anon.get(f"/api/climbers/{cid}/public").status_code == 404
+    assert nalle.patch("/api/me", json={"public_profile": True}).json()["public_profile"] is True
+    pub = anon.get(f"/api/climbers/{cid}/public").json()
+    assert pub["name"] == "Nalle" and len(pub["ranking"]) == 6 and len(pub["comparisons"]) == 11
+    assert nalle.patch("/api/me", json={"public_profile": False}).json()["public_profile"] is False
+    assert anon.get(f"/api/climbers/{cid}/public").status_code == 404
 
     # bad inputs
     assert nalle.post("/api/me/comparisons", json={"problem_a": ids[0], "problem_b": ids[0], "verdict": "SIMILAR"}).status_code == 400

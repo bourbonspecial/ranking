@@ -19,8 +19,11 @@ later as an afterthought.
   replaces that prior.
 - **Everything is recomputable.** Raw comparisons are the source of truth.
   Ratings are derived and can be recomputed from scratch under any algorithm.
-- **Names visible to members, votes visible to nobody.** Members can see who is
-  on the site; individual votes are never shown to other users.
+- **Names visible to members, votes visible to nobody by default.** Members can
+  see who is on the site; individual votes are never shown to other members.
+  A member may opt in to a public page (`/climber/{id}`) showing their own
+  personal ordering and answers. The global list is members-only until there
+  are enough votes, then goes public (admin decision, not yet built).
 
 ## Entities
 
@@ -133,14 +136,12 @@ Members:
 4. **Compare** — one pair at a time, three buttons, keyboard shortcuts,
    progress indicator ("14 of 210 pairs answered"). Option to skip.
 5. **My comparisons** — list of everything answered, editable.
-6. **Ranking** — the ordered list. Columns: rank, problem, area, seed grade,
+6. **Ranking** — tabs: **Global** (the ordered list, with stats: problems,
+   coverage, comparisons, voters) and **Personal** (own ordering vs global rank). Columns: rank, problem, area, seed grade,
    rating, confidence. Filter by grade/country, algorithm switcher.
    **Gated:** visible once the climber has made 10 comparisons, or all of
    their possible pairs if fewer than 10.
-7. **Profile** — climber's ascents, comparison count, and their **personal
-   ranking**: their ascents ordered by their own comparisons only (fit the
-   same model on just their data), shown alongside the global rank for each.
-   Private to the climber.
+7. **Profile** — stats and the public/private toggle for the personal page.
 
 Admin:
 8. **Invite requests** — queue of requests; approve (sends magic-link invite)

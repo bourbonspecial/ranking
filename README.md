@@ -49,7 +49,8 @@ public address; `RANKING_ADMIN_EMAILS` for emails that become admins on first si
 | `GET/PUT /api/me/ascents` · `GET /api/me/progress` | member | tick list and ranking-gate progress |
 | `GET /api/me/pairs` · `POST /api/me/comparisons` · `GET /api/me/comparisons` | member | compare flow; posting an already-answered pair revises it |
 | `GET /api/ranking?algo=` | member (gated) | latest stored ranking; `bradley_terry` / `elo` / `win_rate` |
-| `GET /api/me/ranking` | member | personal ranking with global rank alongside |
+| `GET /api/me/ranking` · `PATCH /api/me` | member | personal ranking with global rank alongside; toggle `public_profile` |
+| `GET /api/climbers/{id}/public` | anyone | a member's personal ordering + answers, only if they opted in |
 | `GET /api/admin/climbers?status=` · `POST /api/admin/climbers/{id}/invite` · `POST /api/admin/invite` · `POST /api/admin/climbers/{id}/reject` · `POST /api/admin/climbers/{id}/admin` · `POST /api/admin/recompute` | admin | invite queue and tooling |
 
 Ascents are `done` or `tried`. Comparisons involving a tried problem are offered last, opt-in,
