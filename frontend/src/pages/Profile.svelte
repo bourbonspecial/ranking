@@ -19,7 +19,7 @@
     <div class="row" style="margin: 1rem 0 2rem; gap:.75rem">
       <div class="card stat"><div class="big">{progress.n_done}</div><div class="muted small">climbed</div></div>
       <div class="card stat"><div class="big">{progress.n_tried}</div><div class="muted small">tried</div></div>
-      <div class="card stat"><div class="big">{progress.n_done_answered + progress.n_attempt_answered}</div><div class="muted small">comparisons made</div></div>
+      <div class="card stat"><div class="big">{progress.n_done_answered + progress.n_attempt_answered}</div><div class="muted small">comparisons</div></div>
     </div>
   {/if}
 
@@ -40,4 +40,4 @@
     {#if err}<p class="error small" style="margin-top:.5rem">{err}</p>{/if}
   </div>
 </div>
-<style>.stat { min-width: 140px; } .big { font-size: 1.8rem; font-family: var(--mono); }</style>
+<style>.stat { min-width: 120px; } @media (max-width: 640px) { .stat { min-width: 0; flex: 1 1 28%; } } .big { font-size: 1.8rem; font-family: var(--mono); }</style>

@@ -41,9 +41,9 @@
     {:else if data}
       <div class="row stats">
         <div class="card stat"><div class="big">{data.stats.n_problems}</div><div class="muted small">problems</div></div>
-        <div class="card stat"><div class="big">{data.stats.n_with_data} <span class="faint" style="font-size:1rem">· {pct(data.stats.n_with_data, data.stats.n_problems)}%</span></div><div class="muted small">with at least one vote</div></div>
-        <div class="card stat"><div class="big">{data.n_comparisons}</div><div class="muted small">comparisons in this view</div></div>
-        <div class="card stat"><div class="big">{data.stats.n_voters} <span class="faint" style="font-size:1rem">/ {data.stats.n_members}</span></div><div class="muted small">members who have voted</div></div>
+        <div class="card stat"><div class="big">{data.stats.n_with_data} <span class="faint" style="font-size:1rem">· {pct(data.stats.n_with_data, data.stats.n_problems)}%</span></div><div class="muted small">voted on</div></div>
+        <div class="card stat"><div class="big">{data.n_comparisons}</div><div class="muted small">comparisons</div></div>
+        <div class="card stat"><div class="big">{data.stats.n_voters} <span class="faint" style="font-size:1rem">/ {data.stats.n_members}</span></div><div class="muted small">voters</div></div>
       </div>
       <div class="row" style="justify-content: space-between; margin: 1rem 0 .75rem">
         <p class="muted small" style="margin:0">{data.include_attempts ? `Including attempts at ${Math.round(data.attempt_weight * 100)}% weight` : 'Climbed-only comparisons'} · {data.computed_at ? 'updated ' + data.computed_at.replace('T', ' ').slice(0, 16) : 'not yet computed'}</p>
@@ -85,8 +85,8 @@
       <div class="row stats">
         <div class="card stat"><div class="big">{progress.n_done}</div><div class="muted small">climbed</div></div>
         <div class="card stat"><div class="big">{progress.n_tried}</div><div class="muted small">tried</div></div>
-        <div class="card stat"><div class="big">{progress.n_done_answered} <span class="faint" style="font-size:1rem">/ {progress.n_done_pairs}</span></div><div class="muted small">climbed pairs answered</div></div>
-        {#if progress.n_attempt_pairs}<div class="card stat"><div class="big">{progress.n_attempt_answered} <span class="faint" style="font-size:1rem">/ {progress.n_attempt_pairs}</span></div><div class="muted small">attempt pairs answered</div></div>{/if}
+        <div class="card stat"><div class="big">{progress.n_done_answered} <span class="faint" style="font-size:1rem">/ {progress.n_done_pairs}</span></div><div class="muted small">climbed pairs</div></div>
+        {#if progress.n_attempt_pairs}<div class="card stat"><div class="big">{progress.n_attempt_answered} <span class="faint" style="font-size:1rem">/ {progress.n_attempt_pairs}</span></div><div class="muted small">attempt pairs</div></div>{/if}
       </div>
     {/if}
     <p class="muted small" style="margin: 1rem 0 .75rem">Your problems ordered by your answers alone, next to where each sits on the global list.
@@ -106,5 +106,6 @@
   .tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
   .tabs button { border: none; border-radius: 0; padding: .45rem 1rem; color: var(--fg2); background: transparent; }
   .tabs button.sel { background: var(--bg3); color: var(--fg); }
-  .stats { gap: .75rem; } .stat { min-width: 150px; padding: .9rem 1.1rem; } .big { font-size: 1.6rem; font-family: var(--mono); line-height: 1.2; }
+  .stats { gap: .75rem; } .stat { min-width: 130px; padding: .8rem 1rem; }
+  @media (max-width: 640px) { .stats { display: grid; grid-template-columns: 1fr 1fr; } .stat { min-width: 0; } .big { font-size: 1.35rem; } } .big { font-size: 1.6rem; font-family: var(--mono); line-height: 1.2; }
 </style>
