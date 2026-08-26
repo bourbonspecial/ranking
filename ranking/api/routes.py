@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from .. import repo
 from ..confidence import confidence_tier
+from ..scale import grade_to_rating
 from ..db import ASCENT_DONE, ASCENT_TRIED, AscentRow, ClimberRow, ComparisonRow, ProblemRow
 from ..models import Verdict
 from . import auth
@@ -197,7 +198,9 @@ def ranking(algo: str = "bradley_terry", include_attempts: bool = False,
         RankingRowOut(rank=snap.rank, problem=problem_out(prob), rating=round(snap.rating, 1),
                       uncertainty=None if snap.uncertainty is None else round(snap.uncertainty, 1),
                       n_comparisons=snap.n_comparisons, n_climbers=snap.n_climbers,
-                      confidence=confidence_tier(snap.n_comparisons, snap.n_climbers), seed_grade=prob.seed_grade)
+                      confidence=confidence_tier(snap.n_comparisons, snap.n_climbers), seed_grade=prob.seed_grade,
+                      seed_rating=grade_to_rating(prob.seed_grade),
+                      delta=round(snap.rating - grade_to_rating(prob.seed_grade), 1))
         for snap, prob in repo.latest_ranking(s, algo, include_attempts)
     ]
     n_members = s.scalar(select(func.count()).select_from(ClimberRow).where(ClimberRow.status == "active")) or 0

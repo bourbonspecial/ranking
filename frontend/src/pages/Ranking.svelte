@@ -65,7 +65,12 @@
             <td><strong>{r.problem.name}</strong></td>
             <td class="muted">{r.problem.crag}</td>
             <td><span class="grade">{r.problem.grade}</span></td>
-            <td class="num">{r.rating.toFixed(0)}</td>
+            <td class="num">
+              {r.rating.toFixed(0)}
+              {#if r.delta >= 1}<span class="mv up" title="Up {r.delta.toFixed(0)} from its {r.seed_grade} starting point of {r.seed_rating.toFixed(0)}">▲<span class="d">{r.delta.toFixed(0)}</span></span>
+              {:else if r.delta <= -1}<span class="mv down" title="Down {Math.abs(r.delta).toFixed(0)} from its {r.seed_grade} starting point of {r.seed_rating.toFixed(0)}">▼<span class="d">{Math.abs(r.delta).toFixed(0)}</span></span>
+              {:else}<span class="mv none"></span>{/if}
+            </td>
             <td class="num faint">{r.uncertainty == null ? '' : r.uncertainty.toFixed(0)}</td>
             <td><span class="pill {r.confidence}">{r.confidence}</span></td>
             <td class="num faint" title="{r.n_climbers} climbers">{r.n_comparisons}</td>
@@ -73,7 +78,7 @@
         {/each}
         </tbody>
       </table></div>
-      <p class="faint small" style="margin-top: 1rem">Rating is on an Elo-like scale seeded from grade (8C 1500 · 8C+ 1750 · 9A 2000 · 9A+ 2250) and overwritten by comparisons as they accumulate. ± is one standard deviation where the model provides it. The global list is members-only for now.</p>
+      <p class="faint small" style="margin-top: 1rem">Rating is on an Elo-like scale seeded from grade (8C 1500 · 8C+ 1750 · 9A 2000 · 9A+ 2250) and overwritten by comparisons as they accumulate. ± is one standard deviation where the model provides it. <span class="up">▲</span>/<span class="down">▼</span> show how far a problem has moved from its grade's starting rating. The global list is members-only for now.</p>
     {/if}
   {:else}
     {#if progress}
@@ -95,6 +100,9 @@
 </div>
 
 <style>
+  .mv { display: inline-block; min-width: 3.2em; text-align: left; margin-left: .35rem; font-size: .75rem; }
+  .mv .d { margin-left: .15rem; }
+  .up, .mv.up { color: var(--ok); } .down, .mv.down { color: var(--danger); }
   .tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
   .tabs button { border: none; border-radius: 0; padding: .45rem 1rem; color: var(--fg2); background: transparent; }
   .tabs button.sel { background: var(--bg3); color: var(--fg); }

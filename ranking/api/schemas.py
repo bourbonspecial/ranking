@@ -99,6 +99,8 @@ class RankingRowOut(BaseModel):
     n_climbers: int
     confidence: str
     seed_grade: str
+    seed_rating: float   # where the problem started (from its grade)
+    delta: float         # rating - seed_rating; > 0 has moved up, < 0 down
 
 
 class RankingStatsOut(BaseModel):

@@ -117,6 +117,10 @@ def test_invite_request_then_admin_invite_then_member_flow(app, anon, admin):
     with_att = nalle.get("/api/ranking", params={"include_attempts": "true"}).json()
     assert with_att["n_comparisons"] == 11 and with_att["attempt_weight"] == 0.4
     assert rk["rows"][0]["rank"] == 1
+    top = rk["rows"][0]
+    assert top["seed_rating"] in (1500.0, 1750.0, 2000.0, 2250.0)
+    assert abs(top["delta"] - (top["rating"] - top["seed_rating"])) < 0.11
+    assert all(r["delta"] == 0 for r in rk["rows"] if r["n_comparisons"] == 0)
     assert nalle.get("/api/ranking", params={"algo": "elo"}).json()["algorithm"] == "elo"
     assert nalle.get("/api/ranking", params={"algo": "bogus"}).status_code == 400
 
