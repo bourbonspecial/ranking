@@ -81,27 +81,38 @@ def ascent_statuses(s: Session, climber_id: int) -> dict[int, str]:
     return {a.problem_id: a.status for a in rows}
 
 
-def set_ascents(s: Session, climber_id: int, done: list[int], tried: list[int] = ()) -> None:
+def set_ascents(s: Session, climber_id: int, done: list[int], tried: list[int] = ()) -> bool:
     """Replace the climber's list. A problem in both lists counts as done.
 
     Problems removed entirely take their comparisons with them; a change of
     status keeps comparisons (their weight is derived at read time).
+    Returns True if anything changed (callers then owe the ranking a recompute).
+    Raises ValueError for unknown problem ids.
     """
     want = {pid: ASCENT_TRIED for pid in tried}
     want.update({pid: ASCENT_DONE for pid in done})
+    if want:
+        known = set(s.scalars(select(ProblemRow.id).where(ProblemRow.id.in_(want))))
+        if bad := set(want) - known:
+            raise ValueError(f"unknown problem ids: {sorted(bad)}")
     have = {a.problem_id: a for a in s.scalars(select(AscentRow).where(AscentRow.climber_id == climber_id))}
+    changed = False
     for pid in set(have) - set(want):
         s.delete(have[pid])
         s.query(ComparisonRow).filter(
             ComparisonRow.climber_id == climber_id,
             (ComparisonRow.problem_a == pid) | (ComparisonRow.problem_b == pid),
         ).delete(synchronize_session=False)
+        changed = True
     for pid, status in want.items():
-        if pid in have:
-            have[pid].status = status
-        else:
+        if pid not in have:
             s.add(AscentRow(climber_id=climber_id, problem_id=pid, status=status))
+            changed = True
+        elif have[pid].status != status:
+            have[pid].status = status
+            changed = True
     s.flush()
+    return changed
 
 
 def ticked_problems(s: Session, climber_id: int, status: str | None = None) -> list[Problem]:

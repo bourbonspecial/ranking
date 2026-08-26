@@ -4,7 +4,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from ranking.api import create_app
-from ranking.api.settings import Settings
+from ranking.api.email import Mailer
+from ranking.api.settings import RateLimit, Settings
 from ranking.db import PROBLEMS_CSV
 from ranking.importer import build_seed_db
 
@@ -241,7 +242,7 @@ def test_missing_boulder_suggestion_emails_admins(app, admin):
     assert "Daniel Woods" in sent["body"] and "admin@example.com" in sent["body"]
 
     # a grade the scale doesn't know is rejected, and so is a duplicate of an existing problem
-    assert admin.post("/api/problem-suggestions", json={**body, "grade": "7A"}).status_code == 400
+    assert admin.post("/api/problem-suggestions", json={**body, "grade": "7A"}).status_code == 422
     existing = admin.get("/api/problems").json()[0]
     dupe = {**body, "name": existing["name"].lower(), "crag": existing["crag"].upper()}
     assert admin.post("/api/problem-suggestions", json=dupe).status_code == 409
@@ -249,9 +250,35 @@ def test_missing_boulder_suggestion_emails_admins(app, admin):
 
 def test_suggestions_are_rate_limited(app):
     settings = Settings(db_path=app.state.settings.db_path, admin_emails=["admin@example.com"],
-                        recompute_debounce_seconds=0, suggestion_rate_limit_requests=1)
+                        recompute_debounce_seconds=0, rate_limits={"suggestion": RateLimit(1, 3600)})
     client = sign_in(create_app(settings), "admin@example.com")
     body = {"name": "One", "grade": "8C"}
     assert client.post("/api/problem-suggestions", json=body).status_code == 202
     r = client.post("/api/problem-suggestions", json={**body, "name": "Two"})
     assert r.status_code == 429 and r.headers["Retry-After"]
+
+
+def test_suggestion_input_is_cleaned(app, admin):
+    # blank names are rejected before anything is emailed
+    assert admin.post("/api/problem-suggestions", json={"name": "   ", "grade": "8C"}).status_code == 422
+    # header injection via newlines is neutralised, and the grade is normalised
+    r = admin.post("/api/problem-suggestions", json={"name": "Foo\nBcc: x@y.z", "grade": " 9a "})
+    assert r.status_code == 202
+    sent = app.state.mailer.sent[-1]
+    assert "\n" not in sent["subject"] and "Bcc: x@y.z" in sent["subject"]
+    assert "9A" in sent["body"]
+
+
+def test_failed_suggestion_email_refunds_the_token(app):
+    settings = Settings(db_path=app.state.settings.db_path, admin_emails=["admin@example.com"],
+                        recompute_debounce_seconds=0, rate_limits={"suggestion": RateLimit(1, 3600)})
+    a = create_app(settings)
+    client = sign_in(a, "admin@example.com")
+
+    def boom(*args, **kwargs):
+        raise ConnectionRefusedError("smtp down")
+    a.state.mailer.problem_suggestion = boom
+    r = client.post("/api/problem-suggestions", json={"name": "One", "grade": "8C"})
+    assert r.status_code == 503
+    a.state.mailer.problem_suggestion = Mailer(settings).problem_suggestion
+    assert client.post("/api/problem-suggestions", json={"name": "One", "grade": "8C"}).status_code == 202

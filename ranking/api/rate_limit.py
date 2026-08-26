@@ -47,3 +47,11 @@ class SlidingWindowRateLimiter:
             for key in keys:
                 self._events[key].append(now)
             return None
+
+    def refund(self, keys: Iterable[str]) -> None:
+        """Undo the most recent consume for these keys (the action failed, so don't charge for it)."""
+        with self._lock:
+            for key in dict.fromkeys(keys):
+                events = self._events.get(key)
+                if events:
+                    events.pop()

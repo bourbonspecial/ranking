@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy import func, select
@@ -7,28 +9,22 @@ from sqlalchemy.orm import Session
 
 from .. import repo
 from ..confidence import confidence_tier
-from ..scale import GRADE_SEED, grade_to_rating
+from ..scale import grade_to_rating
 from ..db import ASCENT_DONE, ASCENT_TRIED, AscentRow, ClimberRow, ComparisonRow, ProblemRow
 from ..models import Verdict
 from . import auth
-from .deps import get_db, get_mailer, get_recomputer, get_settings
+from .deps import client_ip, get_db, get_mailer, get_recomputer, get_settings, rate_limited
 from .schemas import (
     AscentsIn, AscentsOut, ClimberOut, ComparisonIn, ComparisonOut, EmailIn, InviteIn, InviteRequestIn,
     MeUpdateIn, PairOut, PersonalRowOut, ProblemOut, ProblemSuggestionIn, ProgressOut, PublicProfileOut,
     RankingOut, RankingRowOut, RankingStatsOut,
 )
 
+log = logging.getLogger(__name__)
+
 public = APIRouter(prefix="/api")
 member = APIRouter(prefix="/api", dependencies=[Depends(auth.current_climber)])
 admin = APIRouter(prefix="/api/admin", dependencies=[Depends(auth.current_admin)])
-
-
-def _limit_public_request(request: Request, limiter, email: str) -> None:
-    ip = request.client.host if request.client else "unknown"
-    retry_after = limiter.consume((f"ip:{ip}", f"email:{email.lower()}"))
-    if retry_after is not None:
-        raise HTTPException(429, "Too many requests. Try again later.",
-                            headers={"Retry-After": str(retry_after)})
 
 
 def problem_out(p: ProblemRow) -> ProblemOut:
@@ -69,8 +65,9 @@ def _comparison_rows(s: Session, climber_id: int) -> list[ComparisonOut]:
 # ---- public -----------------------------------------------------------------
 
 @public.post("/invite-requests", status_code=202)
-def request_invite(body: InviteRequestIn, request: Request, s: Session = Depends(get_db)):
-    _limit_public_request(request, request.app.state.invite_limiter, body.email)
+def request_invite(body: InviteRequestIn, request: Request, s: Session = Depends(get_db),
+                   limit=Depends(rate_limited("invite"))):
+    limit((f"ip:{client_ip(request)}", f"email:{body.email.lower()}"))
     existing = repo.get_climber_by_email(s, body.email)
     if existing is None:
         repo.add_climber(s, body.name, body.email, status="requested", request_note=body.note)
@@ -81,8 +78,12 @@ def request_invite(body: InviteRequestIn, request: Request, s: Session = Depends
 
 @public.post("/auth/request-link", status_code=202)
 def request_link(body: EmailIn, request: Request, s: Session = Depends(get_db), settings=Depends(get_settings),
-                 mailer=Depends(get_mailer)):
-    _limit_public_request(request, request.app.state.magic_link_limiter, body.email)
+                 mailer=Depends(get_mailer), limit=Depends(rate_limited("magic_link"))):
+    limit((f"ip:{client_ip(request)}",))
+    # The per-address cap only stops us mail-bombing someone: it is unauthenticated, so it
+    # must not 429 (that would let anyone lock a member out, and would confirm membership).
+    if limit.consume((f"email:{body.email.lower()}",)) is not None:
+        return {"ok": True}
     climber = repo.get_climber_by_email(s, body.email)
     if climber is None and body.email.lower() in settings.admin_emails:
         climber = repo.add_climber(s, body.email.split("@")[0], body.email, status="active", is_admin=True)
@@ -139,27 +140,25 @@ def list_problems(s: Session = Depends(get_db)):
 
 
 @member.post("/problem-suggestions", status_code=202)
-def suggest_problem(body: ProblemSuggestionIn, request: Request, s: Session = Depends(get_db),
+def suggest_problem(body: ProblemSuggestionIn, s: Session = Depends(get_db),
                     climber=Depends(auth.current_climber), settings=Depends(get_settings),
-                    mailer=Depends(get_mailer)):
+                    mailer=Depends(get_mailer), limit=Depends(rate_limited("suggestion"))):
     """A member reports a boulder missing from the list; admins get an email and decide."""
-    grade = body.grade.upper().strip()
-    if grade not in GRADE_SEED:
-        raise HTTPException(400, f"grade must be one of {sorted(GRADE_SEED)}")
-    name, crag = body.name.strip(), body.crag.strip()
-    existing = s.scalar(select(ProblemRow).where(func.lower(ProblemRow.name) == name.lower(),
-                                                 func.lower(ProblemRow.crag) == crag.lower()))
+    existing = s.scalar(select(ProblemRow).where(func.lower(ProblemRow.name) == body.name.lower(),
+                                                 func.lower(ProblemRow.crag) == body.crag.lower()))
     if existing is not None:
         raise HTTPException(409, f"{existing.name} ({existing.crag}) is already on the list.")
-    retry_after = request.app.state.suggestion_limiter.consume((f"climber:{climber.id}",))
-    if retry_after is not None:
-        raise HTTPException(429, "Too many suggestions. Try again later.",
-                            headers={"Retry-After": str(retry_after)})
+    limit((f"climber:{climber.id}",))
     recipients = sorted({*repo.admin_emails(s), *settings.admin_emails})
-    mailer.problem_suggestion(recipients, climber.name, climber.email, {
-        "name": name, "crag": crag, "country": body.country.strip(), "grade": grade,
-        "fa": body.fa_name.strip(), "date": body.fa_date.strip(), "note": body.note.strip(),
-    }, settings.base_url)
+    try:
+        mailer.problem_suggestion(recipients, climber.name, climber.email, {
+            "name": body.name, "crag": body.crag, "country": body.country, "grade": body.grade,
+            "fa": body.fa_name, "date": body.fa_date, "note": body.note,
+        }, settings.base_url)
+    except OSError as e:  # smtplib errors are OSErrors; nothing was delivered
+        log.exception("could not email admins about a suggested boulder")
+        limit.refund((f"climber:{climber.id}",))
+        raise HTTPException(503, "Couldn't reach the mail server. Please try again in a minute.") from e
     return {"ok": True}
 
 
@@ -173,13 +172,11 @@ def get_ascents(s: Session = Depends(get_db), climber=Depends(auth.current_climb
 @member.put("/me/ascents", response_model=ProgressOut)
 def put_ascents(body: AscentsIn, s: Session = Depends(get_db), climber=Depends(auth.current_climber),
                 recomputer=Depends(get_recomputer)):
-    known = {p.id for p in s.scalars(select(ProblemRow))}
-    bad = (set(body.done) | set(body.tried)) - known
-    if bad:
-        raise HTTPException(400, f"unknown problem ids: {sorted(bad)}")
-    before = repo.ascent_statuses(s, climber.id)
-    repo.set_ascents(s, climber.id, body.done, body.tried)
-    if repo.ascent_statuses(s, climber.id) != before:
+    try:
+        changed = repo.set_ascents(s, climber.id, body.done, body.tried)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    if changed:
         # Status changes alter attempt weights, and removals delete comparisons.
         # Commit before recomputing so the background session sees those changes.
         s.commit()

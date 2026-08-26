@@ -1,8 +1,18 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, EmailStr, Field
+import re
+
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from ..models import Verdict
+from ..scale import grade_to_rating
+
+_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def _clean(v: str) -> str:
+    """Single-line text: strip control characters (incl. CR/LF) and surrounding whitespace."""
+    return _CONTROL.sub(" ", v).strip()
 
 
 class ProblemOut(BaseModel):
@@ -50,13 +60,36 @@ class InviteIn(BaseModel):
 
 class ProblemSuggestionIn(BaseModel):
     """A member reporting a boulder that is missing from the list."""
-    name: str = Field(min_length=1, max_length=120)
+    name: str = Field(max_length=120)
     crag: str = Field(default="", max_length=120)
     country: str = Field(default="", max_length=120)
-    grade: str = Field(min_length=1, max_length=10)
+    grade: str = Field(max_length=10)
     fa_name: str = Field(default="", max_length=120)
     fa_date: str = Field(default="", max_length=40)
     note: str = Field(default="", max_length=2000)
+
+    @field_validator("name", "crag", "country", "fa_name", "fa_date", mode="after")
+    @classmethod
+    def _single_line(cls, v: str) -> str:
+        return _clean(v)
+
+    @field_validator("name", mode="after")
+    @classmethod
+    def _name_required(cls, v: str) -> str:
+        if not v:
+            raise ValueError("name must not be blank")
+        return v
+
+    @field_validator("note", mode="after")
+    @classmethod
+    def _strip_note(cls, v: str) -> str:
+        return v.strip()
+
+    @field_validator("grade", mode="after")
+    @classmethod
+    def _known_grade(cls, v: str) -> str:
+        grade_to_rating(v.strip())  # raises ValueError listing the known grades
+        return v.strip().upper()
 
 
 class AscentsIn(BaseModel):

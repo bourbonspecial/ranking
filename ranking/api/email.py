@@ -14,6 +14,8 @@ class Mailer:
         self.sent: list[dict] = []  # kept for tests / console backend
 
     def send(self, to: str, subject: str, body: str) -> None:
+        """Deliver one message. `to` may hold several comma-separated addresses."""
+        subject = " ".join(subject.split())  # headers must be a single line
         self.sent.append({"to": to, "subject": subject, "body": body})
         if self.settings.email_backend == "console":
             print(f"\n--- email to {to} ---\n{subject}\n\n{body}\n--- end ---\n", file=sys.stderr)
@@ -59,5 +61,6 @@ class Mailer:
             f"{lines}\n\n"
             f"Add it from the admin panel if it belongs on the list:\n{base_url}/admin\n"
         )
-        for address in to:
-            self.send(address, f"Missing boulder: {fields.get('name', '?')}", body)
+        # One message to all admins: a partial failure can't leave some notified and the
+        # member looking at an error.
+        self.send(", ".join(to), f"Missing boulder: {fields.get('name', '?')}", body)

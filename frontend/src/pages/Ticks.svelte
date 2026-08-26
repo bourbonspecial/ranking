@@ -40,7 +40,7 @@
     sugBusy = true; sugErr = ''
     try {
       await api.post('/api/problem-suggestions', form)
-      sugSent = form.name; form = null
+      sugSent = form.name; form = null; q = ''  // clear the search so the "no match" card doesn't come straight back
     } catch (x) { sugErr = x.message } finally { sugBusy = false }
   }
 </script>
@@ -69,7 +69,7 @@
     <p class="ok small">Thanks — <strong>{sugSent}</strong> has been sent to the admins. They'll add it if it belongs on the list.</p>
   {/if}
 
-  {#if noMatch && !form}
+  {#if noMatch && !form && problems.length}
     <div class="card empty">
       <p class="muted" style="margin:0">No problem matches “{q}”.</p>
       <button class="primary" onclick={openForm}>Add boulder</button>
