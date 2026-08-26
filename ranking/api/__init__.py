@@ -35,6 +35,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         settings.magic_link_rate_limit_requests, settings.magic_link_rate_limit_window_seconds)
     app.state.invite_limiter = SlidingWindowRateLimiter(
         settings.invite_rate_limit_requests, settings.invite_rate_limit_window_seconds)
+    app.state.suggestion_limiter = SlidingWindowRateLimiter(
+        settings.suggestion_rate_limit_requests, settings.suggestion_rate_limit_window_seconds)
     app.state.recomputer = Recomputer(session_factory, settings.recompute_debounce_seconds, settings.attempt_weight)
     app.include_router(public)
     app.include_router(member)

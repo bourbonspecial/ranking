@@ -48,6 +48,17 @@ class InviteIn(BaseModel):
     email: EmailStr
 
 
+class ProblemSuggestionIn(BaseModel):
+    """A member reporting a boulder that is missing from the list."""
+    name: str = Field(min_length=1, max_length=120)
+    crag: str = Field(default="", max_length=120)
+    country: str = Field(default="", max_length=120)
+    grade: str = Field(min_length=1, max_length=10)
+    fa_name: str = Field(default="", max_length=120)
+    fa_date: str = Field(default="", max_length=40)
+    note: str = Field(default="", max_length=2000)
+
+
 class AscentsIn(BaseModel):
     done: list[int] = Field(default_factory=list)   # climbed
     tried: list[int] = Field(default_factory=list)  # attempted, not climbed

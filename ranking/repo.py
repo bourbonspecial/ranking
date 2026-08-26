@@ -69,6 +69,12 @@ def get_climber_by_email(s: Session, email: str) -> ClimberRow | None:
     return s.scalar(select(ClimberRow).where(ClimberRow.email == email.lower().strip()))
 
 
+def admin_emails(s: Session) -> list[str]:
+    """Active admins, for notifications that need a human to act on them."""
+    return sorted(s.scalars(select(ClimberRow.email)
+                            .where(ClimberRow.is_admin == True, ClimberRow.status == "active")))  # noqa: E712
+
+
 def ascent_statuses(s: Session, climber_id: int) -> dict[int, str]:
     """{problem_id: "done" | "tried"} for one climber."""
     rows = s.scalars(select(AscentRow).where(AscentRow.climber_id == climber_id))

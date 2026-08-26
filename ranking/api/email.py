@@ -50,3 +50,14 @@ class Mailer:
             f"Sign in any time by requesting a link at {base_url}\n"
         )
         self.send(to, "Welcome to The List", body)
+
+    def problem_suggestion(self, to: list[str], suggested_by: str, by_email: str, fields: dict,
+                           base_url: str) -> None:
+        lines = "\n".join(f"  {k:<8} {v}" for k, v in fields.items() if v)
+        body = (
+            f"{suggested_by} ({by_email}) reports a boulder missing from the list:\n\n"
+            f"{lines}\n\n"
+            f"Add it from the admin panel if it belongs on the list:\n{base_url}/admin\n"
+        )
+        for address in to:
+            self.send(address, f"Missing boulder: {fields.get('name', '?')}", body)

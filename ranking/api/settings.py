@@ -27,6 +27,8 @@ class Settings:
     magic_link_rate_limit_window_seconds: float = 900.0
     invite_rate_limit_requests: int = 10
     invite_rate_limit_window_seconds: float = 3600.0
+    suggestion_rate_limit_requests: int = 5
+    suggestion_rate_limit_window_seconds: float = 3600.0
     recompute_debounce_seconds: float = 20.0
     attempt_weight: float = 0.4               # weight of a comparison involving a problem only attempted
     cookie_secure: bool = False
@@ -49,6 +51,8 @@ class Settings:
             magic_link_rate_limit_window_seconds=float(e("RANKING_MAGIC_LINK_RATE_WINDOW", "900")),
             invite_rate_limit_requests=int(e("RANKING_INVITE_RATE_LIMIT", "10")),
             invite_rate_limit_window_seconds=float(e("RANKING_INVITE_RATE_WINDOW", "3600")),
+            suggestion_rate_limit_requests=int(e("RANKING_SUGGESTION_RATE_LIMIT", "5")),
+            suggestion_rate_limit_window_seconds=float(e("RANKING_SUGGESTION_RATE_WINDOW", "3600")),
             recompute_debounce_seconds=float(e("RANKING_RECOMPUTE_DEBOUNCE", "20")),
             attempt_weight=float(e("RANKING_ATTEMPT_WEIGHT", "0.4")),
             cookie_secure=e("RANKING_COOKIE_SECURE", "0") == "1",

@@ -7,15 +7,15 @@ from sqlalchemy.orm import Session
 
 from .. import repo
 from ..confidence import confidence_tier
-from ..scale import grade_to_rating
+from ..scale import GRADE_SEED, grade_to_rating
 from ..db import ASCENT_DONE, ASCENT_TRIED, AscentRow, ClimberRow, ComparisonRow, ProblemRow
 from ..models import Verdict
 from . import auth
 from .deps import get_db, get_mailer, get_recomputer, get_settings
 from .schemas import (
     AscentsIn, AscentsOut, ClimberOut, ComparisonIn, ComparisonOut, EmailIn, InviteIn, InviteRequestIn,
-    MeUpdateIn, PairOut, PersonalRowOut, ProblemOut, ProgressOut, PublicProfileOut, RankingOut,
-    RankingRowOut, RankingStatsOut,
+    MeUpdateIn, PairOut, PersonalRowOut, ProblemOut, ProblemSuggestionIn, ProgressOut, PublicProfileOut,
+    RankingOut, RankingRowOut, RankingStatsOut,
 )
 
 public = APIRouter(prefix="/api")
@@ -136,6 +136,31 @@ def public_profile(climber_id: int, s: Session = Depends(get_db), settings=Depen
 @member.get("/problems", response_model=list[ProblemOut])
 def list_problems(s: Session = Depends(get_db)):
     return [problem_out(p) for p in s.scalars(select(ProblemRow).order_by(ProblemRow.id))]
+
+
+@member.post("/problem-suggestions", status_code=202)
+def suggest_problem(body: ProblemSuggestionIn, request: Request, s: Session = Depends(get_db),
+                    climber=Depends(auth.current_climber), settings=Depends(get_settings),
+                    mailer=Depends(get_mailer)):
+    """A member reports a boulder missing from the list; admins get an email and decide."""
+    grade = body.grade.upper().strip()
+    if grade not in GRADE_SEED:
+        raise HTTPException(400, f"grade must be one of {sorted(GRADE_SEED)}")
+    name, crag = body.name.strip(), body.crag.strip()
+    existing = s.scalar(select(ProblemRow).where(func.lower(ProblemRow.name) == name.lower(),
+                                                 func.lower(ProblemRow.crag) == crag.lower()))
+    if existing is not None:
+        raise HTTPException(409, f"{existing.name} ({existing.crag}) is already on the list.")
+    retry_after = request.app.state.suggestion_limiter.consume((f"climber:{climber.id}",))
+    if retry_after is not None:
+        raise HTTPException(429, "Too many suggestions. Try again later.",
+                            headers={"Retry-After": str(retry_after)})
+    recipients = sorted({*repo.admin_emails(s), *settings.admin_emails})
+    mailer.problem_suggestion(recipients, climber.name, climber.email, {
+        "name": name, "crag": crag, "country": body.country.strip(), "grade": grade,
+        "fa": body.fa_name.strip(), "date": body.fa_date.strip(), "note": body.note.strip(),
+    }, settings.base_url)
+    return {"ok": True}
 
 
 @member.get("/me/ascents", response_model=AscentsOut)

@@ -227,3 +227,31 @@ def test_default_admins_and_startup_promotion(tmp_path):
     # the other default admin can sign in without an invite and arrives as admin
     client = sign_in(app, DEFAULT_ADMIN_EMAILS[1])
     assert client.get("/api/me").json()["is_admin"] is True
+
+
+def test_missing_boulder_suggestion_emails_admins(app, admin):
+    body = {"name": "Return of the Sleepwalker", "crag": "Red Rocks", "country": "USA",
+            "grade": "9A", "fa_name": "Daniel Woods", "fa_date": "2021-03",
+            "note": "not on the list yet"}
+    r = admin.post("/api/problem-suggestions", json=body)
+    assert r.status_code == 202
+    sent = app.state.mailer.sent[-1]
+    assert sent["to"] == "admin@example.com"
+    assert "Return of the Sleepwalker" in sent["subject"]
+    assert "Daniel Woods" in sent["body"] and "admin@example.com" in sent["body"]
+
+    # a grade the scale doesn't know is rejected, and so is a duplicate of an existing problem
+    assert admin.post("/api/problem-suggestions", json={**body, "grade": "7A"}).status_code == 400
+    existing = admin.get("/api/problems").json()[0]
+    dupe = {**body, "name": existing["name"].lower(), "crag": existing["crag"].upper()}
+    assert admin.post("/api/problem-suggestions", json=dupe).status_code == 409
+
+
+def test_suggestions_are_rate_limited(app):
+    settings = Settings(db_path=app.state.settings.db_path, admin_emails=["admin@example.com"],
+                        recompute_debounce_seconds=0, suggestion_rate_limit_requests=1)
+    client = sign_in(create_app(settings), "admin@example.com")
+    body = {"name": "One", "grade": "8C"}
+    assert client.post("/api/problem-suggestions", json=body).status_code == 202
+    r = client.post("/api/problem-suggestions", json={**body, "name": "Two"})
+    assert r.status_code == 429 and r.headers["Retry-After"]
