@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from ..db import LOCAL_DB, REPO_ROOT, init_local_db, make_session_factory
 from .email import Mailer
+from .rate_limit import SlidingWindowRateLimiter
 from .recompute import Recomputer
 from .routes import admin, member, public
 from .settings import Settings
@@ -30,6 +31,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.session_factory = session_factory
     app.state.mailer = Mailer(settings)
+    app.state.magic_link_limiter = SlidingWindowRateLimiter(
+        settings.magic_link_rate_limit_requests, settings.magic_link_rate_limit_window_seconds)
+    app.state.invite_limiter = SlidingWindowRateLimiter(
+        settings.invite_rate_limit_requests, settings.invite_rate_limit_window_seconds)
     app.state.recomputer = Recomputer(session_factory, settings.recompute_debounce_seconds, settings.attempt_weight)
     app.include_router(public)
     app.include_router(member)

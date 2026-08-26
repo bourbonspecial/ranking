@@ -180,6 +180,25 @@ def test_test_users_are_excluded_from_global_ranking(app, admin):
     assert admin.get("/api/ranking").json()["n_comparisons"] == 3
 
 
+def test_ascent_status_change_recomputes_global_ranking(app, admin):
+    admin.post("/api/admin/invite", json={"name": "Alex", "email": "alex@example.com"})
+    climber = TestClient(app, base_url="http://localhost:8000", follow_redirects=False)
+    climber.get(re.search(r"http://\S+", app.state.mailer.sent[-1]["body"]).group(0))
+    ids = [p["id"] for p in climber.get("/api/problems").json()[:3]]
+
+    climber.put("/api/me/ascents", json={"done": ids[:2], "tried": [ids[2]]})
+    climber.post("/api/me/comparisons", json={
+        "problem_a": ids[0], "problem_b": ids[2], "verdict": "A_HARDER",
+    })
+    assert admin.get("/api/ranking").json()["n_comparisons"] == 0
+    assert admin.get("/api/ranking", params={"include_attempts": "true"}).json()["n_comparisons"] == 1
+
+    # Promoting the tried problem to done makes the existing comparison full-weight
+    # and eligible for the default ranking without requiring an admin recompute.
+    climber.put("/api/me/ascents", json={"done": ids, "tried": []})
+    assert admin.get("/api/ranking").json()["n_comparisons"] == 1
+
+
 def test_admin_direct_invite_and_reject(app, admin):
     r = admin.post("/api/admin/invite", json={"name": "Aidan", "email": "aidan@example.com"})
     assert r.status_code == 200 and r.json()["status"] == "invited"

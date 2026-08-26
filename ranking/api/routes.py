@@ -23,6 +23,14 @@ member = APIRouter(prefix="/api", dependencies=[Depends(auth.current_climber)])
 admin = APIRouter(prefix="/api/admin", dependencies=[Depends(auth.current_admin)])
 
 
+def _limit_public_request(request: Request, limiter, email: str) -> None:
+    ip = request.client.host if request.client else "unknown"
+    retry_after = limiter.consume((f"ip:{ip}", f"email:{email.lower()}"))
+    if retry_after is not None:
+        raise HTTPException(429, "Too many requests. Try again later.",
+                            headers={"Retry-After": str(retry_after)})
+
+
 def problem_out(p: ProblemRow) -> ProblemOut:
     return ProblemOut(id=p.id, name=p.name, crag=p.crag, country=p.country, grade=p.current_grade,
                       fa_name=p.fa_name, fa_date=p.fa_date, ascent_count=p.ascent_count)
@@ -61,7 +69,8 @@ def _comparison_rows(s: Session, climber_id: int) -> list[ComparisonOut]:
 # ---- public -----------------------------------------------------------------
 
 @public.post("/invite-requests", status_code=202)
-def request_invite(body: InviteRequestIn, s: Session = Depends(get_db)):
+def request_invite(body: InviteRequestIn, request: Request, s: Session = Depends(get_db)):
+    _limit_public_request(request, request.app.state.invite_limiter, body.email)
     existing = repo.get_climber_by_email(s, body.email)
     if existing is None:
         repo.add_climber(s, body.name, body.email, status="requested", request_note=body.note)
@@ -71,8 +80,9 @@ def request_invite(body: InviteRequestIn, s: Session = Depends(get_db)):
 
 
 @public.post("/auth/request-link", status_code=202)
-def request_link(body: EmailIn, s: Session = Depends(get_db), settings=Depends(get_settings),
+def request_link(body: EmailIn, request: Request, s: Session = Depends(get_db), settings=Depends(get_settings),
                  mailer=Depends(get_mailer)):
+    _limit_public_request(request, request.app.state.magic_link_limiter, body.email)
     climber = repo.get_climber_by_email(s, body.email)
     if climber is None and body.email.lower() in settings.admin_emails:
         climber = repo.add_climber(s, body.email.split("@")[0], body.email, status="active", is_admin=True)
@@ -136,12 +146,19 @@ def get_ascents(s: Session = Depends(get_db), climber=Depends(auth.current_climb
 
 
 @member.put("/me/ascents", response_model=ProgressOut)
-def put_ascents(body: AscentsIn, s: Session = Depends(get_db), climber=Depends(auth.current_climber)):
+def put_ascents(body: AscentsIn, s: Session = Depends(get_db), climber=Depends(auth.current_climber),
+                recomputer=Depends(get_recomputer)):
     known = {p.id for p in s.scalars(select(ProblemRow))}
     bad = (set(body.done) | set(body.tried)) - known
     if bad:
         raise HTTPException(400, f"unknown problem ids: {sorted(bad)}")
+    before = repo.ascent_statuses(s, climber.id)
     repo.set_ascents(s, climber.id, body.done, body.tried)
+    if repo.ascent_statuses(s, climber.id) != before:
+        # Status changes alter attempt weights, and removals delete comparisons.
+        # Commit before recomputing so the background session sees those changes.
+        s.commit()
+        recomputer.schedule()
     return progress(s, climber)
 
 

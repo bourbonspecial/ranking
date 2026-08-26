@@ -23,6 +23,10 @@ class Settings:
     admin_emails: list[str] = field(default_factory=lambda: list(DEFAULT_ADMIN_EMAILS))  # admins; provisioned on first login
     magic_link_ttl_minutes: int = 30
     session_ttl_days: int = 90
+    magic_link_rate_limit_requests: int = 5
+    magic_link_rate_limit_window_seconds: float = 900.0
+    invite_rate_limit_requests: int = 10
+    invite_rate_limit_window_seconds: float = 3600.0
     recompute_debounce_seconds: float = 20.0
     attempt_weight: float = 0.4               # weight of a comparison involving a problem only attempted
     cookie_secure: bool = False
@@ -41,6 +45,10 @@ class Settings:
             smtp_password=e("RANKING_SMTP_PASSWORD", ""),
             admin_emails=sorted({*DEFAULT_ADMIN_EMAILS,
                                  *[x.strip().lower() for x in e("RANKING_ADMIN_EMAILS", "").split(",") if x.strip()]}),
+            magic_link_rate_limit_requests=int(e("RANKING_MAGIC_LINK_RATE_LIMIT", "5")),
+            magic_link_rate_limit_window_seconds=float(e("RANKING_MAGIC_LINK_RATE_WINDOW", "900")),
+            invite_rate_limit_requests=int(e("RANKING_INVITE_RATE_LIMIT", "10")),
+            invite_rate_limit_window_seconds=float(e("RANKING_INVITE_RATE_WINDOW", "3600")),
             recompute_debounce_seconds=float(e("RANKING_RECOMPUTE_DEBOUNCE", "20")),
             attempt_weight=float(e("RANKING_ATTEMPT_WEIGHT", "0.4")),
             cookie_secure=e("RANKING_COOKIE_SECURE", "0") == "1",
