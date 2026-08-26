@@ -56,8 +56,8 @@
         </div>
       </div>
       <div class="field"><input placeholder="Filter…" bind:value={q} /></div>
-      <div class="tableWrap"><table>
-        <thead><tr><th class="num">#</th><th>Problem</th><th>Crag</th><th class="num">Rating</th><th>Grade</th><th class="num">±</th><th>Confidence</th><th class="num">Votes</th></tr></thead>
+      <div class="tableWrap"><table class="ranking-table">
+        <thead><tr><th class="num">#</th><th>Problem</th><th>Crag</th><th class="num"><span class="rating-heading">Rating</span></th><th>Grade</th><th class="num">±</th><th>Confidence</th><th class="num">Votes</th></tr></thead>
         <tbody>
         {#each rows as r}
           <tr>
@@ -102,7 +102,9 @@
 
 <style>
   .pill.test { border-color: var(--accent2); color: var(--accent2); }
-  .mv { display: inline-block; min-width: 3.2em; text-align: left; margin-left: .35rem; font-size: .75rem; }
+  .ranking-table { --movement-width: 2.4rem; --movement-gap: .35rem; }
+  .rating-heading { display: block; padding-right: calc(var(--movement-width) + var(--movement-gap)); }
+  .mv { display: inline-block; min-width: var(--movement-width); text-align: left; margin-left: var(--movement-gap); font-size: .75rem; }
   .mv .d { margin-left: .15rem; }
   .up, .mv.up { color: var(--ok); } .down, .mv.down { color: var(--danger); }
   .tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
