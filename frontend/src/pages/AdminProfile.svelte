@@ -27,6 +27,9 @@
       <span class="mono">{data.email}</span> · profile {data.public_profile ? 'public' : 'private'}
       {#if data.public_profile} (<a href="/climber/{data.id}">view as members see it</a>){/if}
     </p>
+    <p class="muted small">Details: {data.details.gender ? data.details.gender.replace('_', '-') : 'gender not set'}
+      · {data.details.height_cm ? `${data.details.height_cm} cm tall` : 'height not set'}
+      · {data.details.arm_span_cm ? `${data.details.arm_span_cm} cm span` : 'arm span not set'}</p>
     <p class="muted">{data.n_done} climbed · {data.n_tried} tried · {data.n_comparisons} answers{#if data.updated_at}, last on {data.updated_at.slice(0, 10)}{/if}.</p>
 
     <h2 style="margin-top: 1.5rem">Ascents and personal ordering</h2>

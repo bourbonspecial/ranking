@@ -1,6 +1,7 @@
 <script>
   import { api } from '../lib/api.js'
   import { session, refreshMe } from '../lib/session.svelte.js'
+  import DetailsForm from '../lib/DetailsForm.svelte'
   let progress = $state(null), err = $state(''), busy = $state(false), copied = $state(false)
   $effect(() => { load() })
   async function load() { progress = await api.get('/api/me/progress') }
@@ -23,6 +24,13 @@
       <div class="card stat"><div class="big">{progress.n_done_answered + progress.n_attempt_answered}</div><div class="muted small">comparisons</div></div>
     </div>
   {/if}
+
+  <div class="card" style="max-width: 640px; margin-bottom: 1rem">
+    <h2>About you</h2>
+    <p class="muted small">Optional. Gender, height and arm span let us offer filtered versions of the list later
+      (e.g. how the order looks for shorter climbers). Only ever shown in aggregate — never next to your name or your answers.</p>
+    <DetailsForm />
+  </div>
 
   <div class="card" style="max-width: 640px">
     <h2>Visibility</h2>

@@ -64,6 +64,10 @@ class ClimberRow(Base):
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     public_profile: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     is_test: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")  # comparisons excluded from the global ranking
+    # Optional demographics, self-reported, for filtered lists later (issue #1). Never public.
+    gender: Mapped[str] = mapped_column(String, nullable=False, default="", server_default="")  # see schemas.GENDERS
+    height_cm: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    arm_span_cm: Mapped[int | None] = mapped_column(Integer, nullable=True)
     request_note: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
@@ -168,6 +172,9 @@ _ADDED_COLUMNS = [
     ("rating_runs", "include_attempts", "BOOLEAN NOT NULL DEFAULT 0"),
     ("climbers", "public_profile", "BOOLEAN NOT NULL DEFAULT 0"),
     ("climbers", "is_test", "BOOLEAN NOT NULL DEFAULT 0"),
+    ("climbers", "gender", "VARCHAR NOT NULL DEFAULT ''"),
+    ("climbers", "height_cm", "INTEGER"),
+    ("climbers", "arm_span_cm", "INTEGER"),
 ]
 
 

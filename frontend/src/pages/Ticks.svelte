@@ -1,5 +1,8 @@
 <script>
   import { api } from '../lib/api.js'
+  import { session } from '../lib/session.svelte.js'
+  import DetailsForm from '../lib/DetailsForm.svelte'
+  let detailsDismissed = $state(false)
   import { refreshMe } from '../lib/session.svelte.js'
   let problems = $state([]), status = $state({}), q = $state(''), saved = $state(false), err = $state(''), busy = $state(false)
   let dirty = $state(false)
@@ -46,6 +49,16 @@
 </script>
 
 <div class="container">
+  {#if session.me && !session.me.details_complete && !detailsDismissed}
+    <div class="notice" style="margin-bottom: 1.5rem">
+      <div class="row" style="justify-content: space-between; align-items: baseline">
+        <strong>One quick thing first</strong>
+        <button class="ghost small faint" onclick={() => (detailsDismissed = true)}>later</button>
+      </div>
+      <p class="muted small" style="margin: .25rem 0 .75rem">Your gender, height and arm span help us build filtered versions of the list down the line. Optional, private, and you can change it any time from your <a href="/profile">profile</a>.</p>
+      <DetailsForm compact onsaved={() => (detailsDismissed = true)} />
+    </div>
+  {/if}
   <div class="row" style="justify-content: space-between; margin-bottom: 1rem">
     <div>
       <h1>My ascents</h1>
