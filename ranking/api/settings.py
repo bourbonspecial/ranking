@@ -42,7 +42,7 @@ class Settings:
     smtp_user: str = ""
     smtp_password: str = ""
     admin_emails: list[str] = field(default_factory=lambda: list(DEFAULT_ADMIN_EMAILS))  # admins; provisioned on first login
-    magic_link_ttl_minutes: int = 30
+    magic_link_ttl_minutes: int = 60
     session_ttl_days: int = 90
     rate_limits: dict[str, RateLimit] = field(default_factory=lambda: dict(DEFAULT_RATE_LIMITS))
     recompute_debounce_seconds: float = 20.0
