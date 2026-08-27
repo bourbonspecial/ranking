@@ -3,6 +3,10 @@
   let queue = $state([]), progress = $state(null), err = $state(''), busy = $state(false), flash = $state(null)
   let attemptsOk = $state(false)   // user has opted in to comparing problems they've only tried
   let current = $derived(queue[0] ?? null)
+  // Changes every time a different pair is shown; keying the arena on it re-mounts the cards so
+  // the enter animation runs and it is obvious both problems have changed.
+  let pairKey = $derived(current ? `${current.problem_a.id}-${current.problem_b.id}` : '')
+  let seen = $state(0)   // pairs shown so far; the counter is another cue that something moved
   let needOptIn = $derived(current?.kind === 'attempt' && !attemptsOk)
 
   $effect(() => { load(); })
@@ -19,12 +23,14 @@
     const pair = current
     try {
       progress = await api.post('/api/me/comparisons', { problem_a: pair.problem_a.id, problem_b: pair.problem_b.id, verdict })
-      flash = verdict; setTimeout(() => (flash = null), 250)
-      queue = queue.slice(1)
+      // Highlight the chosen side for a beat before the next pair slides in, so the eye
+      // registers "that one was picked" and then "these are new".
+      flash = verdict; await new Promise(r => setTimeout(r, 180)); flash = null
+      queue = queue.slice(1); seen += 1
       if (queue.length < 5) await refill()
     } catch (x) { err = x.message } finally { busy = false }
   }
-  function skip() { if (queue.length > 1) queue = [...queue.slice(1), queue[0]] }
+  function skip() { if (queue.length > 1) { queue = [...queue.slice(1), queue[0]]; seen += 1 } }
   function key(e) {
     if (e.target.tagName === 'INPUT') return
     if (e.key === 'ArrowLeft' || e.key === '1') answer('A_HARDER')
@@ -38,7 +44,7 @@
 
 {#snippet card(p, status, side)}
   {@const verdict = side === 'a' ? 'A_HARDER' : 'B_HARDER'}
-  <button class="side" class:tried={status === 'tried'} onclick={() => answer(verdict)} disabled={busy}>
+  <button class="side" class:tried={status === 'tried'} class:chosen={flash === verdict} onclick={() => answer(verdict)} disabled={busy}>
     <div class="name">{p.name}</div>
     <div class="meta"><span class="grade">{p.grade}</span> {p.crag}</div>
     <div class="faint small">{p.fa_name}{p.fa_date ? `, ${p.fa_date}` : ''}</div>
@@ -77,14 +83,17 @@
     </div>
   {:else if current}
     {#if current.kind === 'attempt'}<div class="notice small">This pair involves a problem you've tried but not climbed. Answer from how it felt; it counts for less than a comparison between two ascents.</div>{/if}
-    <div class="arena" class:flash>
-      {@render card(current.problem_a, current.status_a, 'a')}
-      <div class="mid">
-        <button class="ghost" onclick={() => answer('SIMILAR')} disabled={busy}>Very similar<br/><kbd>↓</kbd></button>
-        <button class="ghost small faint" onclick={skip}>skip <kbd>s</kbd></button>
+    {#key pairKey}
+      <div class="arena">
+        <div class="newpair mono small" aria-live="polite">{seen ? 'New pair' : 'Pair'} · #{seen + 1}</div>
+        {@render card(current.problem_a, current.status_a, 'a')}
+        <div class="mid">
+          <button class="ghost" class:chosen={flash === 'SIMILAR'} onclick={() => answer('SIMILAR')} disabled={busy}>Very similar<br/><kbd>↓</kbd></button>
+          <button class="ghost small faint" onclick={skip}>skip <kbd>s</kbd></button>
+        </div>
+        {@render card(current.problem_b, current.status_b, 'b')}
       </div>
-      {@render card(current.problem_b, current.status_b, 'b')}
-    </div>
+    {/key}
     {#if err}<p class="error">{err}</p>{/if}
     <p class="faint small" style="margin-top: 1.5rem">Answer for yourself, not for the consensus. You can change any answer later under <a href="/mine">My answers</a>.
       {#if progress.ranking_unlocked}<a href="/ranking">See the list →</a>{/if}</p>
@@ -92,10 +101,17 @@
 </div>
 
 <style>
-  .arena { display: grid; grid-template-columns: 1fr auto 1fr; gap: 1rem; align-items: stretch; transition: opacity .15s; }
-  .arena.flash { opacity: .4; }
-  .side { text-align: left; padding: 1.5rem; border-radius: 12px; background: var(--bg2); min-height: 200px; display: flex; flex-direction: column; gap: .35rem; }
+  .arena { position: relative; display: grid; grid-template-columns: 1fr auto 1fr; gap: 1rem; align-items: stretch; padding-top: 1.6rem; transition: opacity .15s; }
+  /* Each new pair slides up and its cards briefly glow, so a change is visible even when the names look alike. */
+  .arena { animation: arena-in .35s ease-out both; }
+  .newpair { position: absolute; top: 0; left: 0; color: var(--accent); letter-spacing: .06em; text-transform: uppercase; animation: chip-fade 1.6s ease-out both; }
+  .side { text-align: left; padding: 1.5rem; border-radius: 12px; background: var(--bg2); min-height: 200px; display: flex; flex-direction: column; gap: .35rem; animation: card-glow 1.2s ease-out both; }
   .side:hover { border-color: var(--accent); }
+  .side.chosen, .mid .chosen { border-color: var(--accent); background: var(--bg3); }
+  @keyframes arena-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  @keyframes card-glow { 0% { box-shadow: 0 0 0 0 rgba(224,176,74,.55); border-color: var(--accent); } 100% { box-shadow: 0 0 0 10px rgba(224,176,74,0); } }
+  @keyframes chip-fade { 0%, 60% { opacity: 1; } 100% { opacity: .35; } }
+  @media (prefers-reduced-motion: reduce) { .arena, .side, .newpair { animation: none; } }
   .side.tried { border-style: dashed; }
   .name { font-size: 1.5rem; font-weight: 500; line-height: 1.2; }
   .meta { color: var(--fg2); }
