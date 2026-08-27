@@ -9,11 +9,25 @@
   function applyImport(changes) {
     const st = { ...status }
     for (const [id, value] of changes) st[id] = value
-    status = st; dirty = changes.length > 0 || dirty; saved = false
+    status = st
+    if (changes.length) scheduleSave(0)  // an import is deliberate: save straight away
   }
   import { refreshMe } from '../lib/session.svelte.js'
+  import { route, replace } from '../lib/router.svelte.js'
+  // "/" shows this page only while the member has no ascents. Pin the URL so the first
+  // autosave (which updates n_ascents) doesn't swap the page out from under them.
+  $effect(() => { if (route.path === '/') replace('/ticks') })
   let problems = $state([]), status = $state({}), q = $state(''), saved = $state(false), err = $state(''), busy = $state(false)
-  let dirty = $state(false)
+  let dirty = $state(false)   // changes not yet on the server
+  // Autosave. Toggles are debounced so a mis-click that is undone straight away never reaches
+  // the server (un-ticking a problem deletes the answers given about it); an in-flight save is
+  // followed by another if anything changed while it ran.
+  const SAVE_DELAY = 800
+  let timer = null, pending = false
+  function scheduleSave(delay = SAVE_DELAY) {
+    dirty = true; saved = false
+    clearTimeout(timer); timer = setTimeout(save, delay)
+  }
 
   $effect(() => { load() })
   async function load() {
@@ -25,15 +39,25 @@
   function set(id, value) {
     const st = { ...status }
     if (st[id] === value) delete st[id]; else st[id] = value
-    status = st; dirty = true; saved = false
+    status = st; scheduleSave()
   }
   async function save() {
+    clearTimeout(timer); timer = null
+    if (busy) { pending = true; return }   // save() runs again when the current one finishes
     busy = true; err = ''
     const done = Object.keys(status).filter(k => status[k] === 'done').map(Number)
     const tried = Object.keys(status).filter(k => status[k] === 'tried').map(Number)
-    try { await api.put('/api/me/ascents', { done, tried }); saved = true; dirty = false; await refreshMe() }
-    catch (x) { err = x.message } finally { busy = false }
+    try { await api.put('/api/me/ascents', { done, tried }); saved = true; dirty = pending; await refreshMe() }
+    catch (x) { err = `Couldn't save: ${x.message}`; dirty = true }
+    finally { busy = false }
+    if (pending) { pending = false; save() }
   }
+  // Flush a pending debounce if the member navigates away or closes the tab.
+  $effect(() => {
+    const flush = () => { if (timer) save() }
+    window.addEventListener('pagehide', flush)
+    return () => { window.removeEventListener('pagehide', flush); flush() }
+  })
   let nDone = $derived(Object.values(status).filter(v => v === 'done').length)
   let nTried = $derived(Object.values(status).filter(v => v === 'tried').length)
   let shown = $derived(problems.filter(p => !q || (p.name + ' ' + p.crag + ' ' + p.grade).toLowerCase().includes(q.toLowerCase())))
@@ -74,14 +98,15 @@
     </div>
     <div class="row">
       <span class="muted">{nDone} climbed · {nTried} tried</span>
-      <button class="primary" onclick={save} disabled={busy || !dirty}>Save</button>
+      <span class="autosave small mono" class:busy={busy || dirty} class:ok={saved && !dirty && !err} aria-live="polite">
+        {#if err}not saved{:else if busy}saving…{:else if dirty}saving soon{:else if saved}saved{:else}&nbsp;{/if}
+      </span>
     </div>
   </div>
   <div class="status small" aria-live="polite">
-    {#if err}<span class="error">{err}</span>
-    {:else if saved}<span class="ok">Saved.</span> {#if nDone >= 2}<a href="/compare">Start comparing →</a>{:else}Mark at least two problems as climbed to start comparing.{/if}
-    {:else if dirty}<span class="muted">Unsaved changes — removing a problem removes any answers you've given about it.</span>
-    {:else}<span class="faint">Your list is never shown to other members. Comparisons involving problems you've only tried count for less.</span>{/if}
+    {#if err}<span class="error">{err}</span> <button class="ghost small" onclick={() => save()}>Retry</button>
+    {:else if saved && !dirty}<span class="ok">Saved.</span> {#if nDone >= 2}<a href="/compare">Start comparing →</a>{:else}Mark at least two problems as climbed to start comparing.{/if}
+    {:else}<span class="faint">Changes save automatically. Un-ticking a problem removes any answers you've given about it. Your list is never shown to other members.</span>{/if}
   </div>
 
   {#if canImport && importing}
@@ -92,7 +117,7 @@
         <strong>Save yourself some ticking</strong>
         <button class="ghost small faint" onclick={() => (importDismissed = true)}>later</button>
       </div>
-      <p class="muted small" style="margin: .25rem 0 .75rem">If you log ascents on climbing-history.org we can pull them in for you: sends become <strong>climbed</strong>, unfinished attempts <strong>tried</strong>. You review everything before it's saved, and nothing is written back.</p>
+      <p class="muted small" style="margin: .25rem 0 .75rem">If you log ascents on climbing-history.org we can pull them in for you: sends become <strong>climbed</strong>, unfinished attempts <strong>tried</strong>. You review everything before it's applied, and nothing is written back.</p>
       <button class="primary" onclick={() => (importing = true)}>Import from climbing-history.org</button>
     </div>
   {/if}
@@ -156,6 +181,8 @@
 
 <style>
   .status { min-height: 1.5rem; margin-bottom: .75rem; }
+  .autosave { min-width: 6.5rem; text-align: right; color: var(--fg3); transition: color .2s; }
+  .autosave.busy { color: var(--fg2); } .autosave.ok { color: var(--ok); }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: .5rem; }
   .tick { display: flex; gap: .7rem; align-items: center; justify-content: space-between; padding: .6rem .75rem; border: 1px solid var(--line); border-radius: 8px; background: var(--bg2); font-size: .95rem; }
   .tick.done { border-color: var(--accent); } .tick.tried { border-color: var(--fg3); }

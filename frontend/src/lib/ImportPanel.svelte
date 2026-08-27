@@ -33,7 +33,7 @@
     <h3 style="margin: 0">Import from climbing-history.org</h3>
     <button type="button" class="ghost small" onclick={onclose}>Close</button>
   </div>
-  <p class="muted small">Find yourself on climbing-history.org and we'll tick the boulders it has for you — sends as <strong>climbed</strong>, unfinished attempts as <strong>tried</strong>. You review the list before anything is saved, and nothing is ever written back to climbing-history.org.</p>
+  <p class="muted small">Find yourself on climbing-history.org and we'll tick the boulders it has for you — sends as <strong>climbed</strong>, unfinished attempts as <strong>tried</strong>. You review the list before anything is applied, and nothing is ever written back to climbing-history.org.</p>
 
   <form onsubmit={search} class="row" style="gap: .5rem; margin-bottom: .75rem">
     <input placeholder="Your name as it appears on climbing-history.org" bind:value={q} minlength="2" style="flex: 1; min-width: 200px" />
@@ -83,7 +83,7 @@
     {/if}
     <div class="row" style="margin-top: 1rem; gap: .75rem; align-items: center">
       <button type="button" class="primary" onclick={apply} disabled={!changes.length}>Apply {changes.length} change{changes.length === 1 ? '' : 's'}</button>
-      <span class="faint small">Applies to your list here; press Save afterwards.{#if preview.n_skipped}&nbsp;{preview.n_skipped} easier problem{preview.n_skipped === 1 ? '' : 's'} ignored.{/if}</span>
+      <span class="faint small">Saved to your list straight away.{#if preview.n_skipped}&nbsp;{preview.n_skipped} easier problem{preview.n_skipped === 1 ? '' : 's'} ignored.{/if}</span>
     </div>
   {/if}
 </div>
