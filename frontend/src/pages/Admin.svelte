@@ -22,7 +22,7 @@
   {#if backfill}
     <div class="card small" style="margin-bottom: 1rem">
       <p style="margin:0 0 .5rem"><strong>{backfill.linked}</strong> problem{backfill.linked === 1 ? '' : 's'} newly linked.
-        {backfill.unmatched_ours.length} of ours have no climbing-history match; {backfill.unmatched_theirs.length} of theirs (8C+) aren't on our list.</p>
+        {backfill.unmatched_ours.length} of ours have no climbing-history match; {backfill.unmatched_theirs.length} of theirs at 8C or harder aren't on our list.</p>
       {#if backfill.unmatched_ours.length}<details><summary class="muted">Ours, unmatched</summary><ul>{#each backfill.unmatched_ours as p}<li>{p.name} <span class="faint">{p.grade} · {p.crag}</span></li>{/each}</ul></details>{/if}
       {#if backfill.unmatched_theirs.length}<details><summary class="muted">Theirs, not on our list</summary><ul>{#each backfill.unmatched_theirs as p}<li>{p.climb_name} <span class="faint">{p.grade} · {p.crag_name || '—'} · #{p.climb_id}</span></li>{/each}</ul></details>{/if}
     </div>

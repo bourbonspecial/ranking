@@ -42,12 +42,12 @@
   {#if err}<p class="error small">{err}</p>{/if}
 
   {#if climbers && !chosen}
-    {#if !climbers.length}<p class="muted small">No climber with two or more 8C+ ascents matches “{q}”. Try a shorter part of your name.</p>
+    {#if !climbers.length}<p class="muted small">No climber with two or more ascents at 8C or harder matches “{q}”. Try a shorter part of your name.</p>
     {:else}
       <div class="list">
         {#each climbers as c}
           <button type="button" class="pickrow" onclick={() => pick(c)} disabled={busy}>
-            <span><strong>{c.climber_name}</strong> <span class="muted small">· {c.hard_boulder_count} boulder{c.hard_boulder_count === 1 ? '' : 's'} at 8C+</span></span>
+            <span><strong>{c.climber_name}</strong> <span class="muted small">· {c.hard_boulder_count} boulder{c.hard_boulder_count === 1 ? '' : 's'} at 8C or harder</span></span>
             <span class="small">That's me →</span>
           </button>
         {/each}
