@@ -6,6 +6,12 @@ export function navigate(path) {
   history.pushState({}, '', path)
   route.path = path
 }
+export function replace(path) {
+  // Swap the current URL without a history entry, e.g. to pin "/" to the page it resolved to.
+  if (path === route.path) return
+  history.replaceState({}, '', path)
+  route.path = path
+}
 window.addEventListener('popstate', () => { route.path = location.pathname })
 document.addEventListener('click', (e) => {
   const a = e.target.closest('a[href]')
