@@ -55,6 +55,22 @@ def test_bad_token_rejected(anon):
     assert anon.get("/api/auth/callback?token=nope").status_code == 400
 
 
+def test_sign_in_email_explains_single_use_and_expiry(app, anon):
+    anon.post("/api/auth/request-link", json={"email": "admin@example.com"})
+    mail = app.state.mailer.sent[-1]
+    assert mail["subject"] == "Your sign-in link for The List"
+    assert "works once" in mail["body"] and "expires in 1 hour" in mail["body"]
+    assert "Already a member" in mail["body"] and app.state.settings.base_url in mail["body"]
+
+
+def test_invite_email_is_distinct_from_sign_in_email(app, admin):
+    admin.post("/api/admin/invite", json={"name": "Nalle", "email": "nalle@example.com"})
+    mail = app.state.mailer.sent[-1]
+    assert mail["subject"] == "You're in: your invitation to The List"
+    assert "has been accepted" in mail["body"] and "works once" in mail["body"]
+    assert "http://" in mail["body"]
+
+
 def test_invite_request_then_admin_invite_then_member_flow(app, anon, admin):
     # 1. stranger requests an invite
     r = anon.post("/api/invite-requests", json={"name": "Nalle", "email": "nalle@example.com", "note": "Burden"})
@@ -67,7 +83,7 @@ def test_invite_request_then_admin_invite_then_member_flow(app, anon, admin):
     assert [c["email"] for c in reqs] == ["nalle@example.com"]
     r = admin.post(f"/api/admin/climbers/{reqs[0]['id']}/invite")
     assert r.json()["status"] == "invited"
-    assert app.state.mailer.sent[-1]["subject"] == "You're invited"
+    assert app.state.mailer.sent[-1]["subject"] == "You're in: your invitation to The List"
 
     # 3. member follows the invite link and is active
     nalle = TestClient(app, base_url="http://localhost:8000", follow_redirects=False)

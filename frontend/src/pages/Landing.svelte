@@ -52,7 +52,7 @@
           <p class="muted">If the ascents check out, an invitation will find its way to <span class="mono">{email}</span>.</p>
         {:else}
           <h2>Check your email.</h2>
-          <p class="muted">If <span class="mono">{email}</span> belongs to a member, a sign-in link is on its way. It's valid for 30 minutes.</p>
+          <p class="muted">If <span class="mono">{email}</span> belongs to a member, a sign-in link is on its way. It works once and is valid for an hour — if it expires, just come back here and ask for another.</p>
         {/if}
       </div>
     {:else}

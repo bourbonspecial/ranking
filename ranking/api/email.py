@@ -29,14 +29,36 @@ class Mailer:
                 smtp.login(self.settings.smtp_user, self.settings.smtp_password)
             smtp.send_message(msg)
 
+    def _ttl(self) -> str:
+        m = self.settings.magic_link_ttl_minutes
+        if m % 60 == 0:
+            h = m // 60
+            return "1 hour" if h == 1 else f"{h} hours"
+        return f"{m} minutes"
+
     def magic_link(self, to: str, name: str, url: str, invite: bool) -> None:
+        """Send a sign-in link. `invite=True` is the acceptance email; otherwise a routine sign-in."""
+        ttl, home = self._ttl(), self.settings.base_url
+        how = (
+            f"This link works once and expires in {ttl}. If it has expired, or you want to sign in on\n"
+            f"another device, go to {home} and choose \"Already a member\" - a fresh link\n"
+            "will be emailed to you straight away.\n"
+        )
         if invite:
-            subject = "You're invited"
-            body = (f"{name},\n\nYou've been invited to rank the hardest boulders in the world.\n\n"
-                    f"Sign in here (link valid for {self.settings.magic_link_ttl_minutes} minutes):\n{url}\n")
+            subject = "You're in: your invitation to The List"
+            body = (
+                f"{name},\n\n"
+                "Your request to join The List has been accepted. You're now a member.\n\n"
+                "There is no password. Signing in is always done with a link like the one below - click it\n"
+                f"to open your account and get started:\n\n{url}\n\n{how}"
+            )
         else:
-            subject = "Your sign-in link"
-            body = f"{name},\n\nSign in here (valid for {self.settings.magic_link_ttl_minutes} minutes):\n{url}\n"
+            subject = "Your sign-in link for The List"
+            body = (
+                f"{name},\n\n"
+                f"Here is the sign-in link you asked for:\n\n{url}\n\n{how}\n"
+                "If you didn't request this, you can ignore it - nobody can sign in without this email.\n"
+            )
         self.send(to, subject, body)
 
     def welcome(self, to: str, name: str, base_url: str) -> None:
