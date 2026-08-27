@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from ..db import LOCAL_DB, REPO_ROOT, init_local_db, make_session_factory
+from ..db import LOCAL_DB, REPO_ROOT, create_schema, init_local_db, make_session_factory
 from ..sync import ClimbingHistoryClient
 from .email import Mailer
 from .rate_limit import SlidingWindowRateLimiter
@@ -19,6 +19,7 @@ from .settings import DEFAULT_RATE_LIMITS, Settings
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
     db_path: Path = settings.db_path or init_local_db()
+    create_schema(db_path)  # idempotent: applies _ADDED_COLUMNS to an explicitly configured RANKING_DB too
     session_factory = make_session_factory(db_path)
 
     @asynccontextmanager

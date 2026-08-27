@@ -40,6 +40,18 @@ def admin(app):
     return sign_in(app, "admin@example.com")
 
 
+def test_explicit_db_path_is_migrated_on_startup(tmp_path):
+    """An existing database from before a column was added must still boot when RANKING_DB
+    points at it (init_local_db only runs for the default path)."""
+    import sqlite3
+    db = tmp_path / "old.sqlite"
+    build_seed_db(PROBLEMS_CSV, db)
+    with sqlite3.connect(db) as c:
+        c.execute("ALTER TABLE climbers DROP COLUMN gender")
+    app = create_app(Settings(db_path=db, admin_emails=["admin@example.com"], recompute_debounce_seconds=0))
+    assert sign_in(app, "admin@example.com").get("/api/me").json()["gender"] == ""
+
+
 def test_unauthenticated_is_rejected(anon):
     assert anon.get("/api/problems").status_code == 401
     assert anon.get("/api/me").json() is None
