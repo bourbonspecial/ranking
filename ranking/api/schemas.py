@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import re
 
+from typing import Literal
+
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from ..models import Verdict
@@ -26,7 +28,23 @@ class ProblemOut(BaseModel):
     ascent_count: int
 
 
-class ClimberOut(BaseModel):
+# Self-reported demographics. "" = not answered. Stored so the list can later be filtered
+# (e.g. by gender or height band) without ever showing who answered what.
+GENDERS = ("", "female", "male", "non_binary", "prefer_not_to_say")
+Gender = Literal["", "female", "male", "non_binary", "prefer_not_to_say"]
+
+
+class DetailsOut(BaseModel):
+    gender: Gender = ""
+    height_cm: int | None = None
+    arm_span_cm: int | None = None
+
+    @property
+    def complete(self) -> bool:
+        return bool(self.gender) and self.height_cm is not None and self.arm_span_cm is not None
+
+
+class ClimberOut(DetailsOut):
     id: int
     name: str
     email: str
@@ -37,10 +55,15 @@ class ClimberOut(BaseModel):
     request_note: str = ""
     public_profile: bool = False
     is_test: bool = False
+    details_complete: bool = False
 
 
 class MeUpdateIn(BaseModel):
+    """Partial update: only fields actually sent are changed (a sent `null` clears a measurement)."""
     public_profile: bool | None = None
+    gender: Gender | None = None
+    height_cm: int | None = Field(default=None, ge=100, le=250)
+    arm_span_cm: int | None = Field(default=None, ge=100, le=260)
 
 
 class InviteRequestIn(BaseModel):
@@ -186,6 +209,7 @@ class AdminProfileOut(PublicProfileOut):
     is_test: bool
     public_profile: bool
     updated_at: str | None  # most recent answer, if any
+    details: DetailsOut
 
 
 class PersonalRowOut(BaseModel):

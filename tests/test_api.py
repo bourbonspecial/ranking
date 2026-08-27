@@ -51,6 +51,30 @@ def test_unknown_email_gets_no_link(app, anon):
     assert len(app.state.mailer.sent) == n
 
 
+def test_member_details_saved_validated_and_kept_off_public_profile(app, admin):
+    admin.post("/api/admin/invite", json={"name": "Nalle", "email": "nalle@example.com"})
+    nalle = sign_in(app, "nalle@example.com")
+    me = nalle.get("/api/me").json()
+    assert me["gender"] == "" and me["height_cm"] is None and me["details_complete"] is False
+
+    r = nalle.patch("/api/me", json={"gender": "male", "height_cm": 178, "arm_span_cm": 185})
+    assert r.status_code == 200 and r.json()["details_complete"] is True
+    # partial update leaves the other fields alone; explicit null clears one
+    assert nalle.patch("/api/me", json={"public_profile": True}).json()["height_cm"] == 178
+    r = nalle.patch("/api/me", json={"arm_span_cm": None}).json()
+    assert r["arm_span_cm"] is None and r["details_complete"] is False
+
+    assert nalle.patch("/api/me", json={"gender": "other"}).status_code == 422
+    assert nalle.patch("/api/me", json={"height_cm": 40}).status_code == 422
+    assert nalle.patch("/api/me", json={"arm_span_cm": 400}).status_code == 422
+
+    # never on the public profile, always visible to admins
+    pub = nalle.get(f"/api/climbers/{me['id']}/public").json()
+    assert not {"gender", "height_cm", "arm_span_cm", "details"} & set(pub)
+    adm = admin.get(f"/api/admin/climbers/{me['id']}/profile").json()
+    assert adm["details"] == {"gender": "male", "height_cm": 178, "arm_span_cm": None}
+
+
 def test_bad_token_rejected(anon):
     assert anon.get("/api/auth/callback?token=nope").status_code == 400
 

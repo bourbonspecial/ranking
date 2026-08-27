@@ -15,7 +15,8 @@ from ..models import Verdict
 from . import auth
 from .deps import client_ip, get_db, get_mailer, get_recomputer, get_settings, rate_limited
 from .schemas import (
-    AdminProfileOut, AscentsIn, AscentsOut, ClimberOut, ComparisonIn, ComparisonOut, EmailIn, InviteIn, InviteRequestIn,
+    AdminProfileOut, AscentsIn, AscentsOut, ClimberOut, ComparisonIn, ComparisonOut, DetailsOut, EmailIn, InviteIn,
+    InviteRequestIn,
     MeUpdateIn, PairOut, PersonalRowOut, ProblemOut, ProblemSuggestionIn, ProgressOut, PublicProfileOut,
     RankingOut, RankingRowOut, RankingStatsOut,
 )
@@ -35,9 +36,15 @@ def problem_out(p: ProblemRow) -> ProblemOut:
 def climber_out(s: Session, c: ClimberRow) -> ClimberOut:
     n_asc = s.scalar(select(func.count()).select_from(AscentRow).where(AscentRow.climber_id == c.id)) or 0
     n_cmp = s.scalar(select(func.count()).select_from(ComparisonRow).where(ComparisonRow.climber_id == c.id)) or 0
+    d = details_out(c)
     return ClimberOut(id=c.id, name=c.name, email=c.email, status=c.status, is_admin=c.is_admin,
                       n_ascents=n_asc, n_comparisons=n_cmp, request_note=c.request_note or "",
-                      public_profile=c.public_profile, is_test=c.is_test)
+                      public_profile=c.public_profile, is_test=c.is_test,
+                      **d.model_dump(), details_complete=d.complete)
+
+
+def details_out(c: ClimberRow) -> DetailsOut:
+    return DetailsOut(gender=c.gender or "", height_cm=c.height_cm, arm_span_cm=c.arm_span_cm)
 
 
 def _personal_rows(s: Session, climber: ClimberRow, attempt_weight: float) -> list[PersonalRowOut]:
@@ -226,6 +233,10 @@ def my_comparisons(s: Session = Depends(get_db), climber=Depends(auth.current_cl
 def update_me(body: MeUpdateIn, s: Session = Depends(get_db), climber=Depends(auth.current_climber)):
     if body.public_profile is not None:
         climber.public_profile = body.public_profile
+    # Demographics are nullable, so distinguish "not sent" from "sent null" (= clear).
+    for f in ("gender", "height_cm", "arm_span_cm"):
+        if f in body.model_fields_set:
+            setattr(climber, f, getattr(body, f) if getattr(body, f) is not None or f != "gender" else "")
     s.flush()
     return climber_out(s, climber)
 
@@ -350,7 +361,8 @@ def admin_profile(climber_id: int, s: Session = Depends(get_db), settings=Depend
     fields = _profile_fields(s, c, settings.attempt_weight)
     latest = max((r.updated_at for r in fields["comparisons"]), default=None)
     return AdminProfileOut(**fields, id=c.id, email=c.email, status=c.status, is_admin=c.is_admin,
-                           is_test=c.is_test, public_profile=c.public_profile, updated_at=latest)
+                           is_test=c.is_test, public_profile=c.public_profile, updated_at=latest,
+                           details=details_out(c))
 
 
 @admin.post("/recompute")
