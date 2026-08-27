@@ -14,6 +14,13 @@ def get_mailer(request: Request):
     return request.app.state.mailer
 
 
+def get_ch_client(request: Request):
+    client = request.app.state.ch_client
+    if client is None:
+        raise HTTPException(503, "Importing from climbing-history.org is not enabled on this server.")
+    return client
+
+
 def get_recomputer(request: Request):
     return request.app.state.recomputer
 

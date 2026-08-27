@@ -48,6 +48,7 @@ class ProblemRow(Base):
     fa_date: Mapped[str] = mapped_column(String, default="")
     ascent_count: Mapped[int] = mapped_column(Integer, default=0)
     ch_url: Mapped[str] = mapped_column(String, default="")
+    ch_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # climbing-history.org climb id, for sync
     __table_args__ = (UniqueConstraint("name", "crag", name="uq_problem_name_crag"),)
 
     @property
@@ -168,6 +169,7 @@ _ADDED_COLUMNS = [
     ("rating_runs", "include_attempts", "BOOLEAN NOT NULL DEFAULT 0"),
     ("climbers", "public_profile", "BOOLEAN NOT NULL DEFAULT 0"),
     ("climbers", "is_test", "BOOLEAN NOT NULL DEFAULT 0"),
+    ("problems", "ch_id", "INTEGER"),
 ]
 
 
