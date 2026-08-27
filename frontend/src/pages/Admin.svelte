@@ -35,7 +35,7 @@
       <tbody>
       {#each rows as c}
         <tr>
-          <td>{c.name}{#if c.is_admin} <span class="pill">admin</span>{/if}{#if c.is_test} <span class="pill test">test</span>{/if}</td>
+          <td><a href="/admin/climber/{c.id}" title="View ascents, answers and personal ordering">{c.name}</a>{#if c.is_admin} <span class="pill">admin</span>{/if}{#if c.is_test} <span class="pill test">test</span>{/if}</td>
           <td class="mono small">{c.email}</td>
           {#if status === 'requested'}<td class="small muted">{c.request_note ?? ''}</td>{/if}
           <td class="num">{c.n_ascents}</td><td class="num">{c.n_comparisons}</td>

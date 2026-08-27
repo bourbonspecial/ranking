@@ -282,3 +282,26 @@ def test_failed_suggestion_email_refunds_the_token(app):
     assert r.status_code == 503
     a.state.mailer.problem_suggestion = Mailer(settings).problem_suggestion
     assert client.post("/api/problem-suggestions", json={"name": "One", "grade": "8C"}).status_code == 202
+
+
+def test_admin_can_view_any_members_profile(app, admin):
+    admin.post("/api/admin/invite", json={"name": "Alex", "email": "alex@example.com"})
+    alex = TestClient(app, base_url="http://localhost:8000", follow_redirects=False)
+    alex.get(re.search(r"http://\S+", app.state.mailer.sent[-1]["body"]).group(0))
+    ids = [p["id"] for p in alex.get("/api/problems").json()[:3]]
+    alex.put("/api/me/ascents", json={"done": ids[:2], "tried": [ids[2]]})
+    alex.post("/api/me/comparisons", json={"problem_a": ids[0], "problem_b": ids[1], "verdict": "A_HARDER"})
+    alex_id = alex.get("/api/me").json()["id"]
+
+    # the profile is private to everyone else...
+    assert alex.get(f"/api/climbers/{alex_id}/public").status_code == 404
+    assert alex.get(f"/api/admin/climbers/{alex_id}/profile").status_code == 403
+    # ...but an admin sees ascents, answers and the personal ordering
+    r = admin.get(f"/api/admin/climbers/{alex_id}/profile")
+    assert r.status_code == 200
+    d = r.json()
+    assert d["email"] == "alex@example.com" and d["status"] == "active" and d["public_profile"] is False
+    assert d["n_done"] == 2 and d["n_tried"] == 1 and d["n_comparisons"] == 1
+    assert {row["problem"]["id"] for row in d["ranking"]} == set(ids)
+    assert d["comparisons"][0]["verdict"] == "A_HARDER" and d["updated_at"] == d["comparisons"][0]["updated_at"]
+    assert admin.get("/api/admin/climbers/9999/profile").status_code == 404
