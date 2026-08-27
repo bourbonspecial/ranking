@@ -10,12 +10,23 @@
   const admin = (c, v) => act(() => api.post(`/api/admin/climbers/${c.id}/admin?value=${v}`), 'Updated')
   const test = (c, v) => act(() => api.post(`/api/admin/climbers/${c.id}/test?value=${v}`), v ? `${c.name} is now a test user; their comparisons are excluded from the ranking` : `${c.name}'s comparisons now count`)
   const recompute = () => act(() => api.post('/api/admin/recompute'), 'Ratings recomputed')
+  let backfill = $state(null)
+  const linkCH = () => act(async () => { backfill = await api.post('/api/admin/sync/climbing-history/backfill') },
+    'Linked to climbing-history.org')
   async function inviteNew(e) { e.preventDefault(); await act(() => api.post('/api/admin/invite', { name, email, is_test: asTest }), `Invitation sent to ${email}${asTest ? ' (test user)' : ''}`); name = ''; email = ''; asTest = false }
   const groups = [['requested', 'Invite requests'], ['invited', 'Invited, not yet signed in'], ['active', 'Members'], ['deactivated', 'Deactivated / rejected']]
 </script>
 
 <div class="container">
-  <div class="row" style="justify-content: space-between"><h1>Admin</h1><button onclick={recompute}>Recompute ratings now</button></div>
+  <div class="row" style="justify-content: space-between"><h1>Admin</h1><div class="row"><button onclick={linkCH} title="Match our problems to climbing-history.org ids by name so member imports join by id">Link climbing-history ids</button><button onclick={recompute}>Recompute ratings now</button></div></div>
+  {#if backfill}
+    <div class="card small" style="margin-bottom: 1rem">
+      <p style="margin:0 0 .5rem"><strong>{backfill.linked}</strong> problem{backfill.linked === 1 ? '' : 's'} newly linked.
+        {backfill.unmatched_ours.length} of ours have no climbing-history match; {backfill.unmatched_theirs.length} of theirs (8C+) aren't on our list.</p>
+      {#if backfill.unmatched_ours.length}<details><summary class="muted">Ours, unmatched</summary><ul>{#each backfill.unmatched_ours as p}<li>{p.name} <span class="faint">{p.grade} · {p.crag}</span></li>{/each}</ul></details>{/if}
+      {#if backfill.unmatched_theirs.length}<details><summary class="muted">Theirs, not on our list</summary><ul>{#each backfill.unmatched_theirs as p}<li>{p.climb_name} <span class="faint">{p.grade} · {p.crag_name || '—'} · #{p.climb_id}</span></li>{/each}</ul></details>{/if}
+    </div>
+  {/if}
   {#if err}<p class="error">{err}</p>{/if}{#if msg}<p class="ok">{msg}</p>{/if}
 
   <div class="card" style="margin: 1rem 0 2rem">
