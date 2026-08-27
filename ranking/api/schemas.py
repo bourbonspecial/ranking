@@ -56,6 +56,7 @@ class EmailIn(BaseModel):
 class InviteIn(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     email: EmailStr
+    is_test: bool = False  # test users' comparisons never count towards the global ranking
 
 
 class ProblemSuggestionIn(BaseModel):

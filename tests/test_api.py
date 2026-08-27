@@ -305,3 +305,16 @@ def test_admin_can_view_any_members_profile(app, admin):
     assert {row["problem"]["id"] for row in d["ranking"]} == set(ids)
     assert d["comparisons"][0]["verdict"] == "A_HARDER" and d["updated_at"] == d["comparisons"][0]["updated_at"]
     assert admin.get("/api/admin/climbers/9999/profile").status_code == 404
+
+
+def test_invite_can_mark_a_test_user_up_front(app, admin, anon):
+    r = admin.post("/api/admin/invite", json={"name": "Tess", "email": "tess@example.com", "is_test": True})
+    assert r.status_code == 200 and r.json()["is_test"] is True and r.json()["status"] == "invited"
+
+    anon.post("/api/invite-requests", json={"name": "Rob", "email": "rob@example.com", "note": ""})
+    rob = next(c for c in admin.get("/api/admin/climbers").json() if c["email"] == "rob@example.com")
+    assert rob["is_test"] is False
+    r = admin.post(f"/api/admin/climbers/{rob['id']}/invite", params={"test": "true"})
+    assert r.status_code == 200 and r.json()["is_test"] is True
+    # a plain resend leaves the flag alone
+    assert admin.post(f"/api/admin/climbers/{rob['id']}/invite").json()["is_test"] is True

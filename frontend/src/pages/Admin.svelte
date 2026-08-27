@@ -1,15 +1,16 @@
 <script>
   import { api } from '../lib/api.js'
-  let climbers = $state([]), err = $state(''), msg = $state(''), name = $state(''), email = $state('')
+  let climbers = $state([]), err = $state(''), msg = $state(''), name = $state(''), email = $state(''), asTest = $state(false)
+  let inviteAsTest = $state({})  // climber id -> invite the requester as a test user
   $effect(() => { load() })
   async function load() { climbers = await api.get('/api/admin/climbers') }
   async function act(fn, ok) { err = ''; msg = ''; try { await fn(); msg = ok; await load() } catch (x) { err = x.message } }
-  const invite = (c) => act(() => api.post(`/api/admin/climbers/${c.id}/invite`), `Invitation sent to ${c.email}`)
+  const invite = (c) => act(() => api.post(`/api/admin/climbers/${c.id}/invite${inviteAsTest[c.id] ? '?test=true' : ''}`), `Invitation sent to ${c.email}${inviteAsTest[c.id] ? ' (test user)' : ''}`)
   const reject = (c) => act(() => api.post(`/api/admin/climbers/${c.id}/reject`), `${c.email} deactivated`)
   const admin = (c, v) => act(() => api.post(`/api/admin/climbers/${c.id}/admin?value=${v}`), 'Updated')
   const test = (c, v) => act(() => api.post(`/api/admin/climbers/${c.id}/test?value=${v}`), v ? `${c.name} is now a test user; their comparisons are excluded from the ranking` : `${c.name}'s comparisons now count`)
   const recompute = () => act(() => api.post('/api/admin/recompute'), 'Ratings recomputed')
-  async function inviteNew(e) { e.preventDefault(); await act(() => api.post('/api/admin/invite', { name, email }), `Invitation sent to ${email}`); name = ''; email = '' }
+  async function inviteNew(e) { e.preventDefault(); await act(() => api.post('/api/admin/invite', { name, email, is_test: asTest }), `Invitation sent to ${email}${asTest ? ' (test user)' : ''}`); name = ''; email = ''; asTest = false }
   const groups = [['requested', 'Invite requests'], ['invited', 'Invited, not yet signed in'], ['active', 'Members'], ['deactivated', 'Deactivated / rejected']]
 </script>
 
@@ -24,6 +25,10 @@
       <input placeholder="Email" type="email" bind:value={email} required style="flex:1" />
       <button class="primary">Send invitation</button>
     </form>
+    <label class="small muted" style="display:flex; align-items:center; gap:.4rem; margin-top:.6rem">
+      <input type="checkbox" bind:checked={asTest} style="width:auto; accent-color: var(--accent2)" />
+      Test user — can use everything, but their comparisons never count towards the global ranking
+    </label>
   </div>
 
   {#each groups as [status, title]}
@@ -41,7 +46,7 @@
           <td class="num">{c.n_ascents}</td><td class="num">{c.n_comparisons}</td>
           {#if status === 'active'}<td><input type="checkbox" checked={c.is_test} onchange={(e) => test(c, e.target.checked)} style="width:auto; accent-color: var(--accent2)" title="Exclude this user's comparisons from the global ranking" /></td>{/if}
           <td style="white-space:nowrap; text-align:right">
-            {#if status === 'requested'}<button class="primary" onclick={() => invite(c)}>Invite</button> <button class="danger" onclick={() => reject(c)}>Reject</button>
+            {#if status === 'requested'}<label class="small muted" style="display:inline-flex; align-items:center; gap:.3rem; margin-right:.5rem" title="Invite as a test user: their comparisons won't count"><input type="checkbox" bind:checked={inviteAsTest[c.id]} style="width:auto; accent-color: var(--accent2)" /> test</label> <button class="primary" onclick={() => invite(c)}>Invite</button> <button class="danger" onclick={() => reject(c)}>Reject</button>
             {:else if status === 'invited'}<button onclick={() => invite(c)}>Resend</button> <button class="danger" onclick={() => reject(c)}>Revoke</button>
             {:else if status === 'active'}<button onclick={() => admin(c, !c.is_admin)}>{c.is_admin ? 'Remove admin' : 'Make admin'}</button> <button class="danger" onclick={() => reject(c)}>Deactivate</button>
             {:else}<button onclick={() => invite(c)}>Re-invite</button>{/if}

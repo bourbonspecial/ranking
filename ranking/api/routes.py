@@ -278,20 +278,23 @@ def climbers(status: str | None = None, s: Session = Depends(get_db)):
     return [climber_out(s, c) for c in s.scalars(q)]
 
 
-def _invite(s: Session, settings, mailer, climber: ClimberRow) -> None:
+def _invite(s: Session, settings, mailer, climber: ClimberRow, is_test: bool | None = None) -> None:
     if climber.status in ("requested", "deactivated"):
         climber.status = "invited"
+    if is_test is not None:
+        climber.is_test = is_test  # no recompute needed: they have no comparisons yet
     url = auth.create_magic_link(s, settings, climber)
     mailer.magic_link(climber.email, climber.name, url, invite=True)
 
 
 @admin.post("/climbers/{climber_id}/invite", response_model=ClimberOut)
-def invite_existing(climber_id: int, s: Session = Depends(get_db), settings=Depends(get_settings),
-                    mailer=Depends(get_mailer)):
+def invite_existing(climber_id: int, test: bool | None = None, s: Session = Depends(get_db),
+                    settings=Depends(get_settings), mailer=Depends(get_mailer)):
+    """Send (or resend) an invitation. `test=true` marks the account as a test user first."""
     c = s.get(ClimberRow, climber_id)
     if c is None:
         raise HTTPException(404)
-    _invite(s, settings, mailer, c)
+    _invite(s, settings, mailer, c, is_test=test)
     return climber_out(s, c)
 
 
@@ -301,7 +304,7 @@ def invite_new(body: InviteIn, s: Session = Depends(get_db), settings=Depends(ge
     c = repo.get_climber_by_email(s, body.email)
     if c is None:
         c = repo.add_climber(s, body.name, body.email, status="invited")
-    _invite(s, settings, mailer, c)
+    _invite(s, settings, mailer, c, is_test=body.is_test)
     return climber_out(s, c)
 
 
