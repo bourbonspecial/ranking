@@ -175,6 +175,18 @@ class PublicProfileOut(BaseModel):
     comparisons: list["ComparisonOut"]
 
 
+class AdminProfileOut(PublicProfileOut):
+    """Everything on a public profile plus account details; admins only, regardless of
+    whether the member has made their profile public."""
+    id: int
+    email: str
+    status: str
+    is_admin: bool
+    is_test: bool
+    public_profile: bool
+    updated_at: str | None  # most recent answer, if any
+
+
 class PersonalRowOut(BaseModel):
     rank: int
     problem: ProblemOut

@@ -15,7 +15,7 @@ from ..models import Verdict
 from . import auth
 from .deps import client_ip, get_db, get_mailer, get_recomputer, get_settings, rate_limited
 from .schemas import (
-    AscentsIn, AscentsOut, ClimberOut, ComparisonIn, ComparisonOut, EmailIn, InviteIn, InviteRequestIn,
+    AdminProfileOut, AscentsIn, AscentsOut, ClimberOut, ComparisonIn, ComparisonOut, EmailIn, InviteIn, InviteRequestIn,
     MeUpdateIn, PairOut, PersonalRowOut, ProblemOut, ProblemSuggestionIn, ProgressOut, PublicProfileOut,
     RankingOut, RankingRowOut, RankingStatsOut,
 )
@@ -119,17 +119,20 @@ def me(s: Session = Depends(get_db), climber=Depends(auth.optional_climber)):
     return None if climber is None else climber_out(s, climber)
 
 
+def _profile_fields(s: Session, c: ClimberRow, attempt_weight: float) -> dict:
+    p = repo.progress(s, c.id)
+    return dict(name=c.name, n_done=p["n_done"], n_tried=p["n_tried"],
+                n_comparisons=p["n_done_answered"] + p["n_attempt_answered"],
+                ranking=_personal_rows(s, c, attempt_weight), comparisons=_comparison_rows(s, c.id))
+
+
 @public.get("/climbers/{climber_id}/public", response_model=PublicProfileOut)
 def public_profile(climber_id: int, s: Session = Depends(get_db), settings=Depends(get_settings)):
     """A member's personal ordering and answers, if they have chosen to make them public."""
     c = s.get(ClimberRow, climber_id)
     if c is None or c.status != "active" or not c.public_profile:
         raise HTTPException(404, "This profile is private or does not exist.")
-    p = repo.progress(s, c.id)
-    return PublicProfileOut(name=c.name, n_done=p["n_done"], n_tried=p["n_tried"],
-                            n_comparisons=p["n_done_answered"] + p["n_attempt_answered"],
-                            ranking=_personal_rows(s, c, settings.attempt_weight),
-                            comparisons=_comparison_rows(s, c.id))
+    return PublicProfileOut(**_profile_fields(s, c, settings.attempt_weight))
 
 
 # ---- member -----------------------------------------------------------------
@@ -332,6 +335,19 @@ def set_test(climber_id: int, value: bool = True, s: Session = Depends(get_db), 
         s.commit()
         recomputer.schedule()
     return climber_out(s, c)
+
+
+@admin.get("/climbers/{climber_id}/profile", response_model=AdminProfileOut)
+def admin_profile(climber_id: int, s: Session = Depends(get_db), settings=Depends(get_settings)):
+    """Read-only view of a member's ascents, answers and personal ordering, for spotting
+    abuse. Available for every account regardless of status or the public-profile flag."""
+    c = s.get(ClimberRow, climber_id)
+    if c is None:
+        raise HTTPException(404)
+    fields = _profile_fields(s, c, settings.attempt_weight)
+    latest = max((r.updated_at for r in fields["comparisons"]), default=None)
+    return AdminProfileOut(**fields, id=c.id, email=c.email, status=c.status, is_admin=c.is_admin,
+                           is_test=c.is_test, public_profile=c.public_profile, updated_at=latest)
 
 
 @admin.post("/recompute")

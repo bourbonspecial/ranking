@@ -103,3 +103,49 @@ Conventions:
   `SlidingWindowRateLimiter` does).
 - No manual testing checklist is a substitute for a test, but UI changes should still be
   clicked through with `./start.sh --dev` and described in the PR.
+
+## Practical notes
+
+Running locally:
+
+- `./start.sh --admin you@example.com` does everything (venv, deps, DB, frontend build, server).
+  Magic links print to the server console in dev (`RANKING_EMAIL_BACKEND=console`).
+- Quick throwaway instance for clicking through a change without touching `data/local.sqlite`:
+
+  ```
+  .venv/bin/python -c "from pathlib import Path; from ranking.db import PROBLEMS_CSV; \
+    from ranking.importer import build_seed_db; build_seed_db(PROBLEMS_CSV, Path('/tmp/ui.sqlite'))"
+  RANKING_DB=/tmp/ui.sqlite RANKING_ADMIN_EMAILS=admin@example.com RANKING_BASE_URL=http://127.0.0.1:8123 \
+    .venv/bin/uvicorn ranking.api.main:app --port 8123
+  ```
+
+  `RANKING_BASE_URL` must match the port or the printed magic link points at the wrong server.
+  Seed a member via the API (invite as admin, follow their link, `PUT /api/me/ascents`,
+  `POST /api/me/comparisons`) rather than by hand-editing SQLite.
+- Configuration is all `RANKING_*` env vars read in `ranking/api/settings.py`; `.env` (gitignored)
+  is loaded by `start.sh`. Add every new var to `.env.example` with a one-line comment.
+
+Conventions and gotchas:
+
+- **Validation belongs in `ranking/api/schemas.py`** (pydantic validators), not in route
+  bodies. Routes should read as: check permissions → call `repo` → shape the response.
+- **Anything that changes comparison weights or deletes comparisons must `s.commit()` then
+  `recomputer.schedule()`** (see `put_ascents`, `post_comparison`, `set_test`); the recompute
+  runs on its own session and won't see uncommitted work.
+- **Rate limits** are named entries in `DEFAULT_RATE_LIMITS`; use the `rate_limited("name")`
+  dependency, never build a limiter in a route. Unauthenticated endpoints must not 429 on a
+  per-email key (that lets anyone lock a member out and confirms membership).
+- **Email headers** come from user input in places; keep them single-line (schemas strip
+  control characters, `Mailer.send` collapses the subject).
+- **Frontend routing** is `frontend/src/lib/router.svelte.js` + the `page` switch in
+  `App.svelte`; the server falls back to `index.html` for unknown paths, so a new page only
+  needs an `App.svelte` entry. Gate admin pages on `session.me.is_admin` there too.
+- Shared UI lives in `frontend/src/lib/` (`PersonalTable`, `AnswersTable`, `Problem`); reuse
+  before writing another table.
+- **Schema changes**: add columns to `db._ADDED_COLUMNS`; deploys migrate automatically.
+- `frontend/dist` is gitignored but shipped by `deploy.sh` — build before deploying.
+- Default admins are hard-coded in `settings.DEFAULT_ADMIN_EMAILS`; tests use
+  `admin_emails=["admin@example.com"]` and `recompute_debounce_seconds=0`.
+- The user's shell is fish; multi-line scripts with bash syntax should be run via `bash -c`.
+- No `gh` CLI is installed; open PRs from the GitHub compare URL that `git push` prints, or
+  via the API with a token.
