@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from ..db import LOCAL_DB, REPO_ROOT, init_local_db, make_session_factory
+from ..sync import ClimbingHistoryClient
 from .email import Mailer
 from .rate_limit import SlidingWindowRateLimiter
 from .recompute import Recomputer
@@ -31,6 +32,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.session_factory = session_factory
     app.state.mailer = Mailer(settings)
+    # Tests swap in a fake; None means sync is unavailable and its endpoints answer 503.
+    app.state.ch_client = ClimbingHistoryClient(settings.ch_api_base, settings.ch_api_key) if settings.ch_api_key else None
     app.state.limiters = {name: SlidingWindowRateLimiter(rl.requests, rl.window_seconds)
                           for name, rl in {**DEFAULT_RATE_LIMITS, **settings.rate_limits}.items()}
     app.state.recomputer = Recomputer(session_factory, settings.recompute_debounce_seconds, settings.attempt_weight)

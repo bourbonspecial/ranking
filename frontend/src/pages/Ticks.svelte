@@ -3,6 +3,13 @@
   import { session } from '../lib/session.svelte.js'
   import DetailsForm from '../lib/DetailsForm.svelte'
   let detailsDismissed = $state(false)
+  import ImportPanel from '../lib/ImportPanel.svelte'
+  let importing = $state(false)
+  function applyImport(changes) {
+    const st = { ...status }
+    for (const [id, value] of changes) st[id] = value
+    status = st; dirty = changes.length > 0 || dirty; saved = false
+  }
   import { refreshMe } from '../lib/session.svelte.js'
   let problems = $state([]), status = $state({}), q = $state(''), saved = $state(false), err = $state(''), busy = $state(false)
   let dirty = $state(false)
@@ -62,7 +69,8 @@
   <div class="row" style="justify-content: space-between; margin-bottom: 1rem">
     <div>
       <h1>My ascents</h1>
-      <p class="muted">Mark everything you've <strong>climbed</strong>, and optionally what you've <strong>tried</strong> but not done. You'll only be asked about problems on this list.</p>
+      <p class="muted">Mark everything you've <strong>climbed</strong>, and optionally what you've <strong>tried</strong> but not done. You'll only be asked about problems on this list.
+        {#if session.me?.sync_sources?.includes('climbing_history') && !importing}<button class="ghost small" onclick={() => (importing = true)}>Import from climbing-history.org</button>{/if}</p>
     </div>
     <div class="row">
       <span class="muted">{nDone} climbed · {nTried} tried</span>
@@ -75,6 +83,8 @@
     {:else if dirty}<span class="muted">Unsaved changes — removing a problem removes any answers you've given about it.</span>
     {:else}<span class="faint">Your list is never shown to other members. Comparisons involving problems you've only tried count for less.</span>{/if}
   </div>
+
+  {#if importing}<ImportPanel current={status} onapply={applyImport} onclose={() => (importing = false)} />{/if}
 
   <div class="field"><input placeholder="Search by name, crag or grade…" bind:value={q} /></div>
 

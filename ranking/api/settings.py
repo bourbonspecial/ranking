@@ -28,6 +28,7 @@ DEFAULT_RATE_LIMITS = {
     "magic_link": RateLimit(5, 900.0),    # per IP, and per email (silently dropped)
     "invite": RateLimit(10, 3600.0),      # per IP and per email
     "suggestion": RateLimit(5, 3600.0),   # per member
+    "sync": RateLimit(30, 3600.0),        # per member: calls out to climbing-history.org
 }
 
 
@@ -48,6 +49,9 @@ class Settings:
     recompute_debounce_seconds: float = 20.0
     attempt_weight: float = 0.4               # weight of a comparison involving a problem only attempted
     cookie_secure: bool = False
+    # climbing-history.org read API used to import ascents; sync is off until a key is set.
+    ch_api_base: str = "https://climbing-history.org/api/v1/the-list"
+    ch_api_key: str = ""
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -68,4 +72,6 @@ class Settings:
             recompute_debounce_seconds=float(e("RANKING_RECOMPUTE_DEBOUNCE", "20")),
             attempt_weight=float(e("RANKING_ATTEMPT_WEIGHT", "0.4")),
             cookie_secure=e("RANKING_COOKIE_SECURE", "0") == "1",
+            ch_api_base=e("RANKING_CH_API_BASE", "https://climbing-history.org/api/v1/the-list").rstrip("/"),
+            ch_api_key=e("RANKING_CH_API_KEY", ""),
         )

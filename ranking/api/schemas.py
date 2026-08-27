@@ -56,6 +56,39 @@ class ClimberOut(DetailsOut):
     public_profile: bool = False
     is_test: bool = False
     details_complete: bool = False
+    sync_sources: list[str] = []  # e.g. ["climbing_history"] when an import source is configured
+
+
+class SyncClimberOut(BaseModel):
+    climber_id: int
+    climber_name: str
+    climber_url: str = ""
+    hard_boulder_count: int = 0
+
+
+class SyncMatchOut(BaseModel):
+    problem: ProblemOut
+    status: str            # what climbing-history says: "done" | "tried"
+    current: str | None    # what the member has ticked here, if anything
+    ch_name: str = ""
+    ch_grade: str = ""
+    ch_url: str = ""
+    date: str = ""
+
+
+class SyncUnmatchedOut(BaseModel):
+    climb_id: int
+    climb_name: str
+    grade: str = ""
+    crag_name: str = ""
+    climb_url: str = ""
+    status: str
+
+
+class SyncPreviewOut(BaseModel):
+    matched: list[SyncMatchOut]
+    unmatched: list[SyncUnmatchedOut]  # 8C+ boulders we don't have; candidates for a suggestion
+    n_skipped: int                     # easier problems, ignored
 
 
 class MeUpdateIn(BaseModel):

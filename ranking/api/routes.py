@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -13,12 +13,13 @@ from ..scale import grade_to_rating
 from ..db import ASCENT_DONE, ASCENT_TRIED, AscentRow, ClimberRow, ComparisonRow, ProblemRow
 from ..models import Verdict
 from . import auth
-from .deps import client_ip, get_db, get_mailer, get_recomputer, get_settings, rate_limited
+from ..sync import SyncError, backfill_ids, preview
+from .deps import get_ch_client, client_ip, get_db, get_mailer, get_recomputer, get_settings, rate_limited
 from .schemas import (
     AdminProfileOut, AscentsIn, AscentsOut, ClimberOut, ComparisonIn, ComparisonOut, DetailsOut, EmailIn, InviteIn,
     InviteRequestIn,
     MeUpdateIn, PairOut, PersonalRowOut, ProblemOut, ProblemSuggestionIn, ProgressOut, PublicProfileOut,
-    RankingOut, RankingRowOut, RankingStatsOut,
+    RankingOut, RankingRowOut, RankingStatsOut, SyncClimberOut, SyncPreviewOut,
 )
 
 log = logging.getLogger(__name__)
@@ -33,13 +34,13 @@ def problem_out(p: ProblemRow) -> ProblemOut:
                       fa_name=p.fa_name, fa_date=p.fa_date, ascent_count=p.ascent_count)
 
 
-def climber_out(s: Session, c: ClimberRow) -> ClimberOut:
+def climber_out(s: Session, c: ClimberRow, sync_sources: list[str] = ()) -> ClimberOut:
     n_asc = s.scalar(select(func.count()).select_from(AscentRow).where(AscentRow.climber_id == c.id)) or 0
     n_cmp = s.scalar(select(func.count()).select_from(ComparisonRow).where(ComparisonRow.climber_id == c.id)) or 0
     d = details_out(c)
     return ClimberOut(id=c.id, name=c.name, email=c.email, status=c.status, is_admin=c.is_admin,
                       n_ascents=n_asc, n_comparisons=n_cmp, request_note=c.request_note or "",
-                      public_profile=c.public_profile, is_test=c.is_test,
+                      public_profile=c.public_profile, is_test=c.is_test, sync_sources=list(sync_sources),
                       **d.model_dump(), details_complete=d.complete)
 
 
@@ -122,8 +123,9 @@ def logout(request: Request, response: Response, s: Session = Depends(get_db)):
 
 
 @public.get("/me")
-def me(s: Session = Depends(get_db), climber=Depends(auth.optional_climber)):
-    return None if climber is None else climber_out(s, climber)
+def me(request: Request, s: Session = Depends(get_db), climber=Depends(auth.optional_climber)):
+    sources = ["climbing_history"] if request.app.state.ch_client is not None else []
+    return None if climber is None else climber_out(s, climber, sources)
 
 
 def _profile_fields(s: Session, c: ClimberRow, attempt_weight: float) -> dict:
@@ -192,6 +194,34 @@ def put_ascents(body: AscentsIn, s: Session = Depends(get_db), climber=Depends(a
         s.commit()
         recomputer.schedule()
     return progress(s, climber)
+
+
+@member.get("/me/sync/climbing-history/climbers", response_model=list[SyncClimberOut])
+def sync_search(q: str = Query(min_length=2, max_length=120), climber=Depends(auth.current_climber),
+                ch=Depends(get_ch_client), limit=Depends(rate_limited("sync"))):
+    """Find the member's climbing-history.org record by name (proxied; the API key stays server-side)."""
+    limit((f"member:{climber.id}",))
+    try:
+        return [SyncClimberOut(**{k: v for k, v in c.items() if k in SyncClimberOut.model_fields})
+                for c in ch.search_climbers(q.strip())]
+    except SyncError as e:
+        raise HTTPException(502, str(e))
+
+
+@member.get("/me/sync/climbing-history/climbers/{ch_climber_id}/preview", response_model=SyncPreviewOut)
+def sync_preview(ch_climber_id: int, s: Session = Depends(get_db), climber=Depends(auth.current_climber),
+                 ch=Depends(get_ch_client), limit=Depends(rate_limited("sync"))):
+    """What importing this climbing-history climber would tick. Read-only: the member reviews
+    the result and saves through PUT /me/ascents."""
+    limit((f"member:{climber.id}",))
+    try:
+        ascents = ch.climber_boulders(ch_climber_id)
+    except SyncError as e:
+        raise HTTPException(502, str(e))
+    result = preview(s, ascents, repo.ascent_statuses(s, climber.id))
+    for row in result["matched"]:
+        row["problem"] = problem_out(row["problem"])
+    return SyncPreviewOut(**result)
 
 
 @member.get("/me/progress", response_model=ProgressOut)
@@ -363,6 +393,17 @@ def admin_profile(climber_id: int, s: Session = Depends(get_db), settings=Depend
     return AdminProfileOut(**fields, id=c.id, email=c.email, status=c.status, is_admin=c.is_admin,
                            is_test=c.is_test, public_profile=c.public_profile, updated_at=latest,
                            details=details_out(c))
+
+
+@admin.post("/sync/climbing-history/backfill")
+def sync_backfill(s: Session = Depends(get_db), ch=Depends(get_ch_client)):
+    """Link our problems to climbing-history.org ids by name so later imports join by id.
+    Returns what could not be matched on either side."""
+    try:
+        boulders = ch.hard_boulders()
+    except SyncError as e:
+        raise HTTPException(502, str(e))
+    return backfill_ids(s, boulders)
 
 
 @admin.post("/recompute")
