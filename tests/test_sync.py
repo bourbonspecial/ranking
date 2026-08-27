@@ -65,6 +65,25 @@ def member(app):
     return sign_in(app, "nalle@example.com")
 
 
+def test_client_sends_key_and_a_real_user_agent(monkeypatch):
+    """Cloudflare 403s the default urllib User-Agent (error 1010); make sure we never send it."""
+    import io
+    from ranking.sync import USER_AGENT, ClimbingHistoryClient
+    seen = {}
+
+    class Resp(io.BytesIO):
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    def fake_urlopen(req, timeout):
+        seen["url"], seen["headers"] = req.full_url, {k.lower(): v for k, v in req.header_items()}
+        return Resp(b"[]")
+    monkeypatch.setattr("ranking.sync.urllib.request.urlopen", fake_urlopen)
+    assert ClimbingHistoryClient("https://ch.example/api/v1/the-list/", "k123").search_climbers("nalle") == []
+    assert seen["url"] == "https://ch.example/api/v1/the-list/climbers?q=nalle&api_key=k123"
+    assert seen["headers"]["user-agent"] == USER_AGENT and "python" not in USER_AGENT.lower()
+
+
 def test_normalisation():
     assert norm("  Soudain Seul! ") == norm("soudain-seul") == "soudain seul"
     assert norm("Ephyra") == norm("Éphyra")

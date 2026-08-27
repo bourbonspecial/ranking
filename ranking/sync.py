@@ -35,13 +35,20 @@ class SyncError(Exception):
     """climbing-history.org was unreachable or answered with an error."""
 
 
+# climbing-history.org sits behind Cloudflare, whose Browser Integrity Check rejects Python's
+# default "Python-urllib/3.x" User-Agent with a 403 (error 1010) before the request reaches the
+# app - identical for good and bad keys, so it looks like an auth problem. Identify ourselves.
+USER_AGENT = "TheList/1.0 (+https://the-list.climbing-history.org)"
+
+
 class ClimbingHistoryClient:
     def __init__(self, base_url: str, api_key: str, timeout: float = 15.0):
         self.base_url, self.api_key, self.timeout = base_url.rstrip("/"), api_key, timeout
 
     def _get(self, path: str, **params) -> list | dict:
         q = urllib.parse.urlencode({**params, "api_key": self.api_key})
-        req = urllib.request.Request(f"{self.base_url}{path}?{q}", headers={"Accept": "application/json"})
+        req = urllib.request.Request(f"{self.base_url}{path}?{q}",
+                                     headers={"Accept": "application/json", "User-Agent": USER_AGENT})
         try:
             with urllib.request.urlopen(req, timeout=self.timeout) as r:
                 return json.load(r)
