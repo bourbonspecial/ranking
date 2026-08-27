@@ -4,7 +4,8 @@
   import DetailsForm from '../lib/DetailsForm.svelte'
   let detailsDismissed = $state(false)
   import ImportPanel from '../lib/ImportPanel.svelte'
-  let importing = $state(false)
+  let importing = $state(false), importDismissed = $state(false)
+  let canImport = $derived(!!session.me?.sync_sources?.includes('climbing_history'))
   function applyImport(changes) {
     const st = { ...status }
     for (const [id, value] of changes) st[id] = value
@@ -69,8 +70,7 @@
   <div class="row" style="justify-content: space-between; margin-bottom: 1rem">
     <div>
       <h1>My ascents</h1>
-      <p class="muted">Mark everything you've <strong>climbed</strong>, and optionally what you've <strong>tried</strong> but not done. You'll only be asked about problems on this list.
-        {#if session.me?.sync_sources?.includes('climbing_history') && !importing}<button class="ghost small" onclick={() => (importing = true)}>Import from climbing-history.org</button>{/if}</p>
+      <p class="muted">Mark everything you've <strong>climbed</strong>, and optionally what you've <strong>tried</strong> but not done. You'll only be asked about problems on this list.</p>
     </div>
     <div class="row">
       <span class="muted">{nDone} climbed · {nTried} tried</span>
@@ -84,7 +84,18 @@
     {:else}<span class="faint">Your list is never shown to other members. Comparisons involving problems you've only tried count for less.</span>{/if}
   </div>
 
-  {#if importing}<ImportPanel current={status} onapply={applyImport} onclose={() => (importing = false)} />{/if}
+  {#if canImport && importing}
+    <ImportPanel current={status} onapply={applyImport} onclose={() => (importing = false)} />
+  {:else if canImport && !importDismissed}
+    <div class="notice" style="margin-bottom: 1.5rem">
+      <div class="row" style="justify-content: space-between; align-items: baseline">
+        <strong>Save yourself some ticking</strong>
+        <button class="ghost small faint" onclick={() => (importDismissed = true)}>later</button>
+      </div>
+      <p class="muted small" style="margin: .25rem 0 .75rem">If you log ascents on climbing-history.org we can pull them in for you: sends become <strong>climbed</strong>, unfinished attempts <strong>tried</strong>. You review everything before it's saved, and nothing is written back.</p>
+      <button class="primary" onclick={() => (importing = true)}>Import from climbing-history.org</button>
+    </div>
+  {/if}
 
   <div class="field"><input placeholder="Search by name, crag or grade…" bind:value={q} /></div>
 
